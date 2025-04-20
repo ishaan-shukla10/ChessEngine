@@ -32,6 +32,9 @@ class GameState():
         elif move.pieceMoved == 'bK':
             self.blackKingLocation = (move.endRow, move.endCol)
 
+        if move.isPawnPromotion:
+            self.board[move.endRow][move.endCol] = move.pieceMoved[0] + 'Q'
+
 
     def undoMove(self):
         if len(self.moveLog) != 0:
@@ -51,7 +54,7 @@ class GameState():
         self.inCheck, self.pins, self.checks = self.checkForPinsAndChecks()
         if self.whiteToMove:
             kingRow = self.whiteKingLocation[0]
-            kingCol = self.blackKingLocation[1]
+            kingCol = self.whiteKingLocation[1]
         else:
             kingRow = self.blackKingLocation[0]
             kingCol = self.blackKingLocation[1]
@@ -74,7 +77,7 @@ class GameState():
                             break
                 
                 for i in range(len(moves)-1, -1, -1):
-                    if moves[i].pieceMoved[i] != 'K':
+                    if moves[i].pieceMoved[1] != 'K':
                         if not (moves[i].endRow, moves[i].endCol) in validSquares:
                             moves.remove(moves[i])
             else:
@@ -172,20 +175,20 @@ class GameState():
 
 
 
-    def inCheck(self):
-        if self.whiteToMove:
-            return self.squareUnderAttack(self.whiteKingLocation[0], self.whiteKingLocation[1])
-        else:
-            return self.squareUnderAttack(self.blackKingLocation[0], self.blackKingLocation[1])
+    # def inCheck(self):
+    #     if self.whiteToMove:
+    #         return self.squareUnderAttack(self.whiteKingLocation[0], self.whiteKingLocation[1])
+    #     else:
+    #         return self.squareUnderAttack(self.blackKingLocation[0], self.blackKingLocation[1])
 
 
-    def squareUnderAttack(self, r, c):
-        self.whiteToMove = not self.whiteToMove
-        oppoMoves = self.getAllPossibleMoves()
-        self.whiteToMove = not self.whiteToMove
-        for move in oppoMoves:
-            if move.endRow == r and move.endCol == c:
-                return True
+    # def squareUnderAttack(self, r, c):
+    #     self.whiteToMove = not self.whiteToMove
+    #     oppoMoves = self.getAllPossibleMoves()
+    #     self.whiteToMove = not self.whiteToMove
+    #     for move in oppoMoves:
+    #         if move.endRow == r and move.endCol == c:
+    #             return True
         
 
 
@@ -329,8 +332,8 @@ class GameState():
         colMoves = (-1, 0, 1, -1, 1, -1, 0, 1)
         allyColor = 'w' if self.whiteToMove else 'b'
         for i in range(8):
-            endRow = r + rowMoves[0]
-            endCol = c + colMoves[1]
+            endRow = r + rowMoves[i]
+            endCol = c + colMoves[i]
             if 0 <= endRow < 8 and 0 <= endCol < 8:
                 endPiece = self.board[endRow][endCol]
                 if endPiece[0] != allyColor:
@@ -367,6 +370,10 @@ class Move():
         self.endCol = endSq[1]
         self.pieceMoved = board[self.startRow][self.startCol]
         self.pieceCaptured = board[self.endRow][self.endCol]
+        self.isPawnPromotion = False
+        self.promotionChoice = 'Q'
+        if (self.pieceMoved == 'wp' and self.endRow == 0) or (self.pieceMoved == 'bp' and self.endRow == 7):
+            self.isPawnPromotion = True
         self.moveID = self.startRow * 1000 + self.startCol * 100 + self.endRow * 10 + self.endCol 
 
     
