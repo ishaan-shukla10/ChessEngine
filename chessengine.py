@@ -18,8 +18,8 @@ class GameState():
         self.whiteKingLocation = (7, 4)
         self.blackKingLocation = (0, 4)
         #self.inCheck = False
-        self.checkMate = False
-        self.staleMate = False
+        self.checkmate = False
+        self.stalemate = False
         self.pins = []
         self.checks = []
         self.enPassantPossible = ()
@@ -179,12 +179,12 @@ class GameState():
         
     #     if len(moves) == 0:
     #         if self.inCheck():
-    #             self.checkMate = True
+    #             self.checkmate = True
     #         else:
-    #             self.staleMate = True
+    #             self.stalemate = True
     #     else:
-    #         self.checkMate = False
-    #         self.staleMate = False
+    #         self.checkmate = False
+    #         self.stalemate = False
 
         
     def getValidMoves(self):
