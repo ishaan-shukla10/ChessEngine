@@ -1,5 +1,6 @@
 import pygame as p
 import chessengine
+import smartmovefinder
 
 WIDTH = HEIGHT = 512
 DIMENSION = 8
@@ -29,14 +30,16 @@ def main():
     sqSelected = ()
     playerClicks = []
     gameOver = False
-
+    playerOne = True
+    playerTwo = False
 
     while running:
+        humanTurn = (gs.whiteToMove and playerOne) or (not gs.whiteToMove and playerTwo)
         for e in p.event.get():
             if e.type == p.QUIT:
                 running = False
             elif e.type == p.MOUSEBUTTONDOWN:
-                if not gameOver:
+                if not gameOver and humanTurn:
                     location = p.mouse.get_pos()
                     col = location[0]//SQ_SIZE
                     row = location[1]//SQ_SIZE
@@ -70,6 +73,13 @@ def main():
                     playerClicks = []
                     moveMade = False
                     animate = False
+
+        if not gameOver and not humanTurn:
+            AIMove = smartmovefinder.findRandomMove(validMoves)
+            gs.makeMove(AIMove)
+            moveMade = True
+            animate = True
+
 
         if moveMade:
             if animate:
