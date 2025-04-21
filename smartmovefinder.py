@@ -107,7 +107,7 @@ def findGreedyMove(gs, validMoves):
 
 
 
-def findBestMove(gs, validMoves):
+def findBestMove(gs, validMoves, returnQueue):
     global nextMove
     nextMove = None
     random.shuffle(validMoves)
@@ -115,7 +115,7 @@ def findBestMove(gs, validMoves):
     #findMoveNegaMax(gs, validMoves, DEPTH, 1 if gs.whiteToMove else -1)
     findMoveNegaMaxAlphaBeta(gs, validMoves, DEPTH, -CHECKMATE, CHECKMATE, 1 if gs.whiteToMove else -1)
 
-    return nextMove 
+    returnQueue.put(nextMove) 
 
 
 
