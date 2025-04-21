@@ -33,8 +33,8 @@ def main():
     sqSelected = ()
     playerClicks = []
     gameOver = False
-    playerOne = True
-    playerTwo = True
+    playerOne = False
+    playerTwo = False
 
     while running:
         humanTurn = (gs.whiteToMove and playerOne) or (not gs.whiteToMove and playerTwo)
@@ -183,7 +183,7 @@ def drawMoveLog(screen, gs, font):
 def drawEndGameText(screen, text):
     font = p.font.SysFont("Helvetica", 32, True, False)
     textObject = font.render(text, 0, p.Color('Gray'))
-    textLocation = p.Rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).move(BOARD_WIDTH//2 - textObject.get_BOARD_WIDTH()/2, BOARD_HEIGHT//2 - textObject.get_BOARD_HEIGHT()/2)
+    textLocation = p.Rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).move(BOARD_WIDTH//2 - textObject.get_width()/2, BOARD_HEIGHT//2 - textObject.get_height()/2)
     screen.blit(textObject, textLocation)
     textObject = font.render(text, 0, p.Color('Black'))
     screen.blit(textObject, textLocation.move(2, 2))
