@@ -105,7 +105,7 @@ def main():
                                 if move == validMoves[i]:
                                     gs.makeMove(validMoves[i])
                                     moveMade = True
-                                    animate = True
+                                    animate = False
                                     sqSelected = ()
                                     playerClicks = []
                                     break
