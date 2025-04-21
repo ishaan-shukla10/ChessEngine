@@ -66,6 +66,7 @@ def main():
                     gs.undoMove()
                     moveMade = True
                     animate = False
+                    gameOver = False
                 if e.key == p.K_r:
                     gs = chessengine.GameState()
                     validMoves = gs.getValidMoves()
@@ -73,9 +74,10 @@ def main():
                     playerClicks = []
                     moveMade = False
                     animate = False
+                    gameOver = False
 
         if not gameOver and not humanTurn:
-            AIMove = smartmovefinder.findGreedyMove(gs, validMoves)
+            AIMove = smartmovefinder.findBestMoveMinMax(gs, validMoves)
             if AIMove is None:
                 AIMove = smartmovefinder.findRandomMove(validMoves)
             gs.makeMove(AIMove)
