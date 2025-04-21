@@ -12,3 +12,4 @@ threatening a major piece with a minor one is good
 chess notations update for pawn promotion and cases like Nbd2
 concept of batteries
 heuristics like rook on open files, bishop and queen pins
+Transposition table and zorbius hashing
