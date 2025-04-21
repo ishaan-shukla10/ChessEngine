@@ -17,7 +17,6 @@ def loadImages():
     for piece in pieces:
         IMAGES[piece] = p.transform.scale(p.image.load(f'images/{piece}.png'), (SQ_SIZE, SQ_SIZE))
 
-
 def main():
     p.init()
     screen = p.display.set_mode((BOARD_WIDTH + MOVE_LOG_PANEL_WIDTH, BOARD_HEIGHT))
@@ -41,34 +40,88 @@ def main():
     moveFinderProcess = None
     moveUndone = False
 
+    piece_dragging = False
+    dragged_piece = None
+    dragged_piece_pos = ()
+    dragged_piece_initial_pos = ()
+
     while running:
         humanTurn = (gs.whiteToMove and playerOne) or (not gs.whiteToMove and playerTwo)
         for e in p.event.get():
+            
             if e.type == p.QUIT:
                 running = False
+
             elif e.type == p.MOUSEBUTTONDOWN:
-                if not gameOver:
+                    if not gameOver and humanTurn and e.button == 1:
+
+                        location = p.mouse.get_pos()
+                        col = location[0]//SQ_SIZE
+                        row = location[1]//SQ_SIZE
+                        
+                        if 0 <= col < 8 and 0 <= row < 8:
+                            piece = gs.board[row][col]
+
+                            if sqSelected == (row, col) or col >= 8:
+                                sqSelected = ()
+                                playerClicks = []
+                            else:
+                                sqSelected = (row, col)
+                                playerClicks.append(sqSelected)
+
+                            if piece != '--' and ((piece[0] == 'w' and gs.whiteToMove) or (piece[0] == 'b' and not gs.whiteToMove)):
+                                piece_dragging = True
+                                dragged_piece = piece
+                                dragged_piece_pos = location
+                                dragged_piece_initial_pos = (row, col)
+
+
+                        if len(playerClicks) == 2:
+                            move = chessengine.Move(playerClicks[0], playerClicks[1], gs.board)
+                            #print(move.getChessNotation())
+                            for i in range(len(validMoves)):
+                                if move == validMoves[i]:
+                                    gs.makeMove(validMoves[i])
+                                    moveMade = True
+                                    animate = True
+                                    sqSelected = ()
+                                    playerClicks = []
+                                    piece_dragging = False
+                                    break
+
+                            if not moveMade:
+                                playerClicks = [sqSelected]
+                
+            elif e.type == p.MOUSEBUTTONUP:
+                if piece_dragging and e.button == 1:
                     location = p.mouse.get_pos()
                     col = location[0]//SQ_SIZE
                     row = location[1]//SQ_SIZE
-                    if sqSelected == (row, col) or col >= 8:
-                        sqSelected = ()
-                        playerClicks = []
-                    else:
-                        sqSelected = (row, col)
-                        playerClicks.append(sqSelected)
-                    if len(playerClicks) == 2 and humanTurn:
-                        move = chessengine.Move(playerClicks[0], playerClicks[1], gs.board)
-                        print(move.getChessNotation())
-                        for i in range(len(validMoves)):
-                            if move == validMoves[i]:
-                                gs.makeMove(validMoves[i])
-                                moveMade = True
-                                animate = True
-                                sqSelected = ()
-                                playerClicks = []
-                        if not moveMade:
-                            playerClicks = [sqSelected]
+
+                    if 0 <= col < 8 and 0 <= row < 8:
+                        if (row, col) != dragged_piece_initial_pos:
+                            move = chessengine.Move(dragged_piece_initial_pos, (row, col), gs.board)
+                            for i in range(len(validMoves)):
+                                if move == validMoves[i]:
+                                    gs.makeMove(validMoves[i])
+                                    moveMade = True
+                                    animate = True
+                                    sqSelected = ()
+                                    playerClicks = []
+                                    break
+                    
+                    piece_dragging = False
+                    dragged_piece = None
+                    dragged_piece_pos = ()
+                    dragged_piece_initial_pos = ()
+
+                    if not moveMade and sqSelected != ():
+                        playerClicks = [sqSelected]
+                
+            elif e.type == p.MOUSEMOTION:
+                if piece_dragging:
+                    dragged_piece_pos = p.mouse.get_pos()
+            
             elif e.type == p.KEYDOWN:
                 if e.key == p.K_z:
                     gs.undoMove()
@@ -115,14 +168,14 @@ def main():
 
         if moveMade:
             if animate:
-                animateMove(gs.moveLog[-1], screen, gs.board, clock)
+                animateMove(gs.moveLog[-1], screen, sqSelected, gs.board, clock)
             validMoves = gs.getValidMoves()
             moveMade = False
             animate = False
             moveUndone = False
 
             
-        drawGameState(screen, gs, validMoves, sqSelected, moveLogFont)
+        drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_dragging, dragged_piece, dragged_piece_pos)
         
         if gs.checkmate:
             gameOver = True
@@ -138,10 +191,10 @@ def main():
         p.display.flip()
 
 
-def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont):
+def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_dragging=False, dragged_piece=None, dragged_piece_pos=()):
     drawBoard(screen)
     highlightSquares(screen, gs, validMoves, sqSelected)
-    drawPieces(screen, gs.board)
+    drawPieces(screen, gs.board, sqSelected, piece_dragging, dragged_piece, dragged_piece_pos)
     drawMoveLog(screen, gs, moveLogFont)
 
 
@@ -159,24 +212,32 @@ def drawBoard(screen):
 def highlightSquares(screen, gs, validMoves, sqSelected):
     if sqSelected != ():
         r, c = sqSelected
-        if gs.board[r][c][0] == ('w' if gs.whiteToMove else 'b'):
-            s = p.Surface((SQ_SIZE, SQ_SIZE))
-            s.set_alpha(100)
-            s.fill(p.Color('blue'))
-            screen.blit(s, (c*SQ_SIZE, r*SQ_SIZE))
-            s.fill(p.Color('yellow'))
-            for move in validMoves:
-                if move.startRow == r and move.startCol == c:
-                    screen.blit(s, (move.endCol*SQ_SIZE, move.endRow*SQ_SIZE))
+        if 0 <= r <8 and 0 <= c < 8:
+            if gs.board[r][c][0] == ('w' if gs.whiteToMove else 'b'):
+                s = p.Surface((SQ_SIZE, SQ_SIZE))
+                s.set_alpha(100)
+                s.fill(p.Color('blue'))
+                screen.blit(s, (c*SQ_SIZE, r*SQ_SIZE))
+                s.fill(p.Color('yellow'))
+                for move in validMoves:
+                    if move.startRow == r and move.startCol == c:
+                        screen.blit(s, (move.endCol*SQ_SIZE, move.endRow*SQ_SIZE))
 
 
 
-def drawPieces(screen, board):
+def drawPieces(screen, board, sqSelected, piece_dragging=False, dragged_piece=None, dragged_piece_pos=()):
     for r in range(DIMENSION):
         for c in range(DIMENSION):
             piece = board[r][c]
             if piece != "--":
-                screen.blit(IMAGES[piece], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+                if not (piece_dragging and (r, c) == sqSelected):
+                    screen.blit(IMAGES[piece], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+    
+    if piece_dragging and dragged_piece and dragged_piece_pos:
+        # Center the piece on the cursor
+        x = dragged_piece_pos[0] - SQ_SIZE//2
+        y = dragged_piece_pos[1] - SQ_SIZE//2
+        screen.blit(IMAGES[dragged_piece], p.Rect(x, y, SQ_SIZE, SQ_SIZE))
 
 
 
@@ -216,7 +277,7 @@ def drawEndGameText(screen, text):
 
 
 
-def animateMove(move, screen, board, clock):
+def animateMove(move, screen, sqSelected, board, clock):
     global colors
     coords = []
     dR = move.endRow - move.startRow
@@ -226,7 +287,7 @@ def animateMove(move, screen, board, clock):
     for frame in range(frameCount+1):
         r,c = (move.startRow + dR*frame/frameCount, move.startCol + dC*frame/frameCount)
         drawBoard(screen)
-        drawPieces(screen, board)
+        drawPieces(screen, board, sqSelected)
         color = colors[(move.endRow + move.endCol) %2]
         endSquare = p.Rect(move.endCol*SQ_SIZE, move.endRow*SQ_SIZE, SQ_SIZE, SQ_SIZE)
         p.draw.rect(screen, color, endSquare)
