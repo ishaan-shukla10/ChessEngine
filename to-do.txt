@@ -9,3 +9,4 @@ teaching forks
 exchange pieces if materially up
 do not stalemate if materially up
 threatening a major piece with a minor one is good
+chess notations update for pawn promotion and cases like Nbd2

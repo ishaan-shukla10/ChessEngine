@@ -492,6 +492,7 @@ class Move():
         self.endCol = endSq[1]
         self.pieceMoved = board[self.startRow][self.startCol]
         self.pieceCaptured = board[self.endRow][self.endCol]
+        self.isCapture = self.pieceCaptured != "--"
         self.isPawnPromotion = False
         # self.promotionChoice = 'Q'
         if (self.pieceMoved == 'wp' and self.endRow == 0) or (self.pieceMoved == 'bp' and self.endRow == 7):
@@ -517,3 +518,21 @@ class Move():
     
     def getRankFile(self, r, c):
         return self.colsToFiles[c] + self.rowsToRanks[r]
+    
+    def __str__(self):
+        if self.isCastleMove:
+            return "O-O" if self.endCol == 6 else "O-O-O"
+        
+        endSquare = self.getRankFile(self.endRow, self.endCol)
+        if self.pieceMoved[1] == 'p':
+            if self.isCapture:
+                return self.colsToFiles[self.startCol] + 'x' + endSquare
+            else:
+                return endSquare
+        
+        moveString = self.pieceMoved[1]
+
+        if self.isCapture:
+            moveString += 'x'
+        
+        return moveString + endSquare

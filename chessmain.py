@@ -2,9 +2,11 @@ import pygame as p
 import chessengine
 import smartmovefinder
 
-WIDTH = HEIGHT = 512
+BOARD_WIDTH = BOARD_HEIGHT = 512
+MOVE_LOG_PANEL_WIDTH = 250
+MOVE_LOG_PANEL_HEIGHT = BOARD_HEIGHT
 DIMENSION = 8
-SQ_SIZE = HEIGHT // 8
+SQ_SIZE = BOARD_HEIGHT // 8
 MAX_FPS = 15
 IMAGES = {}
 
@@ -16,7 +18,7 @@ def loadImages():
 
 def main():
     p.init()
-    screen = p.display.set_mode((WIDTH, HEIGHT))
+    screen = p.display.set_mode((BOARD_WIDTH + MOVE_LOG_PANEL_WIDTH, BOARD_HEIGHT))
     clock = p.time.Clock()
     screen.fill(p.Color('white'))
     gs = chessengine.GameState()
@@ -24,6 +26,7 @@ def main():
     moveMade = False
     animate = False
 
+    moveLogFont = p.font.SysFont("Arial", 14, False, False)
     
     loadImages()
     running = True
@@ -43,7 +46,7 @@ def main():
                     location = p.mouse.get_pos()
                     col = location[0]//SQ_SIZE
                     row = location[1]//SQ_SIZE
-                    if sqSelected == (row, col):
+                    if sqSelected == (row, col) or col >= 8:
                         sqSelected = ()
                         playerClicks = []
                     else:
@@ -93,20 +96,37 @@ def main():
             animate = False
 
             
-        drawGameState(screen, gs, validMoves, sqSelected)
+        drawGameState(screen, gs, validMoves, sqSelected, moveLogFont)
         
         if gs.checkmate:
             gameOver = True
             if gs.whiteToMove:
-                drawText(screen, 'Black wins by checkmate')
+                drawEndGameText(screen, 'Black wins by checkmate')
             else:
-                drawText(screen, 'White wins by checkmate')
+                drawEndGameText(screen, 'White wins by checkmate')
         elif gs.stalemate:
             gameOver = True
-            drawText(screen, 'Stalemate')
+            drawEndGameText(screen, 'Stalemate')
 
         clock.tick(MAX_FPS)
         p.display.flip()
+
+
+def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont):
+    drawBoard(screen)
+    highlightSquares(screen, gs, validMoves, sqSelected)
+    drawPieces(screen, gs.board)
+    drawMoveLog(screen, gs, moveLogFont)
+
+
+
+def drawBoard(screen):
+    global colors
+    colors = [p.Color(241, 207, 167), p.Color(186, 99, 52)]
+    for r in range(DIMENSION):
+        for c in range(DIMENSION):
+            color = colors[((r+c)%2)]
+            p.draw.rect(screen, color, p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 
 
@@ -125,22 +145,6 @@ def highlightSquares(screen, gs, validMoves, sqSelected):
 
 
 
-def drawGameState(screen, gs, validMoves, sqSelected):
-    drawBoard(screen)
-    highlightSquares(screen, gs, validMoves, sqSelected)
-    drawPieces(screen, gs.board)
-
-
-
-def drawBoard(screen):
-    global colors
-    colors = [p.Color(241, 207, 167), p.Color(186, 99, 52)]
-    for r in range(DIMENSION):
-        for c in range(DIMENSION):
-            color = colors[((r+c)%2)]
-            p.draw.rect(screen, color, p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
-
-
 def drawPieces(screen, board):
     for r in range(DIMENSION):
         for c in range(DIMENSION):
@@ -150,10 +154,36 @@ def drawPieces(screen, board):
 
 
 
-def drawText(screen, text):
+def drawMoveLog(screen, gs, font):
+    moveLogRect = p.Rect(BOARD_WIDTH, 0, MOVE_LOG_PANEL_WIDTH, MOVE_LOG_PANEL_HEIGHT)
+    p.draw.rect(screen, p.Color("Black"), moveLogRect)
+    moveLog = gs.moveLog
+    moveTexts = []
+    for i in range(0, len(moveLog), 2):
+        moveString = "   " + str(i//2 + 1) + ". " + str(moveLog[i]) + "  "
+        if i + 1 < len(moveLog):
+            moveString += str(moveLog[i+1])
+        moveTexts.append(moveString)
+    movesPerRow = 3
+    padding = 5
+    textY = padding
+    lineSpacing = 2
+    for i in range(0, len(moveTexts), movesPerRow):
+        text = ""
+        for j in range(movesPerRow):
+            if i + j < len(moveTexts):
+                text +=  moveTexts[i+j]
+        textObject = font.render(text, True, p.Color('White'))
+        textLocation = moveLogRect.move(padding, textY)
+        screen.blit(textObject, textLocation)
+        textY += textObject.get_height() + lineSpacing
+
+
+
+def drawEndGameText(screen, text):
     font = p.font.SysFont("Helvetica", 32, True, False)
     textObject = font.render(text, 0, p.Color('Gray'))
-    textLocation = p.Rect(0, 0, WIDTH, HEIGHT).move(WIDTH//2 - textObject.get_width()/2, HEIGHT//2 - textObject.get_height()/2)
+    textLocation = p.Rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).move(BOARD_WIDTH//2 - textObject.get_BOARD_WIDTH()/2, BOARD_HEIGHT//2 - textObject.get_BOARD_HEIGHT()/2)
     screen.blit(textObject, textLocation)
     textObject = font.render(text, 0, p.Color('Black'))
     screen.blit(textObject, textLocation.move(2, 2))
