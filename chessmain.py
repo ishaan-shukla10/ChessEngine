@@ -30,8 +30,8 @@ def main():
     sqSelected = ()
     playerClicks = []
     gameOver = False
-    playerOne = False
-    playerTwo = False
+    playerOne = True
+    playerTwo = True
 
     while running:
         humanTurn = (gs.whiteToMove and playerOne) or (not gs.whiteToMove and playerTwo)

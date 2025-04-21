@@ -23,6 +23,8 @@ class GameState():
         self.pins = []
         self.checks = []
         self.enPassantPossible = ()
+        self.enPassantPossibleLog = [self.enPassantPossible]
+
         self.currentCastlingRights = CastlingRights(True, True, True, True)
         self.castlingRightsLog = [
             CastlingRights(
@@ -67,6 +69,8 @@ class GameState():
                 self.board[move.endRow][move.endCol+1] = self.board[move.endRow][move.endCol-2]
                 self.board[move.endRow][move.endCol-2] = '--'
 
+        self.enPassantPossibleLog.append(self.enPassantPossible)
+
         self.updateCastlingRights(move)
         self.castlingRightsLog.append(CastlingRights(self.currentCastlingRights.wks,self.currentCastlingRights.bks,
                 self.currentCastlingRights.wqs, self.currentCastlingRights.bqs,))
@@ -88,9 +92,9 @@ class GameState():
             if move.isEnPassantMove:
                 self.board[move.endRow][move.endCol] = '--'
                 self.board[move.startRow][move.endCol] = move.pieceCaptured
-                self.enPassantPossible = (move.endRow, move.endCol)
-            if move.pieceMoved[1] == 'p' and abs(move.startRow - move.endRow) == 2:
-                self.enPassantPossible = ()
+                
+            self.enPassantPossibleLog.pop()
+            self.enPassantPossible = self.enPassantPossibleLog[-1]
             
             self.castlingRightsLog.pop()
             newRights = self.castlingRightsLog[-1]
@@ -186,6 +190,19 @@ class GameState():
                 if move.startCol == 0:
                     self.currentCastlingRights.bqs = False
                 elif move.startCol == 7:
+                    self.currentCastlingRights.bks = False
+        
+        if move.pieceCaptured == 'wR':
+            if move.endRow == 7:
+                if move.endCol == 0:
+                    self.currentCastlingRights.wqs = False
+                elif move.endCol == 7:
+                    self.currentCastlingRights.wks = False
+        elif move.pieceCaptured == 'bR':
+            if move.endRow == 0:
+                if move.endCol == 0:
+                    self.currentCastlingRights.bqs = False
+                elif move.endCol == 7:
                     self.currentCastlingRights.bks = False
 
 
