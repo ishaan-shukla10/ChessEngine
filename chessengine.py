@@ -45,7 +45,8 @@ class GameState():
             self.blackKingLocation = (move.endRow, move.endCol)
 
         if move.isPawnPromotion:
-            promotedPiece = input("Promote to Q, R, B or N: ")
+            # promotedPiece = input("Promote to Q, R, B or N: ")
+            promotedPiece = 'Q'
             self.board[move.endRow][move.endCol] = move.pieceMoved[0] + promotedPiece
 
         if move.isEnPassantMove:
