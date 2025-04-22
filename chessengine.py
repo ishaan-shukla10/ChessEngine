@@ -384,10 +384,10 @@ class GameState():
             victim_piece = move.pieceCaptured[1]
         
             if attacker_piece in self.mvv_lva and victim_piece in self.mvv_lva[attacker_piece]:
-            # Use MVV-LVA table to score the capture
+            
                 score += 1000 + self.mvv_lva[attacker_piece][victim_piece]
             else:
-            # Fallback for any capture not in table
+            
                 score += 1000
 
         enemy_color = 'b' if self.whiteToMove else 'w'
@@ -401,28 +401,28 @@ class GameState():
                 if 0 <= target_r < 8 and 0 <= target_c < 8:
                     target_piece = self.board[target_r][target_c]
                     if target_piece != '--' and target_piece[0] == enemy_color:
-                    # Threaten score based on piece value
+                    
                         piece_threatens += pieceScores.get(target_piece[1], 0) * 10
     
         score += piece_threatens
 
         center_squares = [(3, 3), (3, 4), (4, 3), (4, 4)]
         if (move.endRow, move.endCol) in center_squares:
-            score += 50  # Small bonus for controlling center
+            score += 50  
 
         if move.pieceMoved[1] == 'p':
-        # Calculate how far the pawn has advanced
-            if self.whiteToMove:  # White pawns move up the board (decreasing row)
-                pawn_advance = 7 - move.endRow  # 7 is the starting row for white pawns
-            else:  # Black pawns move down the board (increasing row)
-                pawn_advance = move.endRow  # 0 is the starting row for black pawns
         
-        # Higher bonus for pawns closer to promotion
+            if self.whiteToMove:  
+                pawn_advance = 7 - move.endRow  
+            else:  
+                pawn_advance = move.endRow  
+        
+        
             score += pawn_advance * 10
     
-    # 6. Bonus for castling
+    
         if move.isCastleMove:
-            score += 500  # Good bonus for castling
+            score += 500  
     
         return score
     

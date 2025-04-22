@@ -253,14 +253,14 @@ def scoreBoard(gs):
             piece = gs.board[r][c]
             if piece != '--':
                 if (gs.whiteToMove and piece[0] == 'w') or (not gs.whiteToMove and piece[0] == 'b'):
-                    # Get all squares this piece attacks
+                    
                     attack_squares = gs.getPieceAttackSquares(r, c)
                     if attack_squares:
                         for square in attack_squares:
                             if square in pinned_pieces:
                                 target_piece = gs.board[square[0]][square[1]]
                                 
-                                # Only worth targeting if not a pawn
+                                
                                 if target_piece[1] != 'p':
                                     attacking_pinned_pieces.append({
                                         'attacker': (r, c),
@@ -270,13 +270,13 @@ def scoreBoard(gs):
                                     })
 
     for attack in attacking_pinned_pieces:
-        pin_bonus = attack['piece_value'] * 0.3  # 30% of the piece value as bonus
+        pin_bonus = attack['piece_value'] * 0.3  
         
-        # Extra bonus if it's pinned to the king (more critical)
+        
         if attack['is_king_pin']:
             pin_bonus *= 1.5
             
-        # Apply the bonus
+        
         if gs.whiteToMove:
             score += pin_bonus
         else:
@@ -306,29 +306,29 @@ def scoreBoard(gs):
                     else:
                         piecePositionScore = piecePositionScores[square[1]][row][col]
                 
-                # Bonus for maintaining pins you've created
+                
                 pin_maintainer_bonus = 0
                 if (row, col) in [attack['attacker'] for attack in attacking_pinned_pieces]:
-                    pin_maintainer_bonus = 0.5  # Bonus for piece that's pinning something
+                    pin_maintainer_bonus = 0.5  
                 
-                # Apply position bonus
+                
                 piece_value = pieceScores[square[1]]
                 if square[0] == 'w':
                     score += piece_value + piecePositionScore * 0.1 + pin_maintainer_bonus
                 elif square[0] == 'b':
                     score -= piece_value + piecePositionScore * 0.1 + pin_maintainer_bonus
                 
-                # Special bonus/penalty for pinned pieces
+                
                 if (row, col) in pinned_pieces:
                     pin_info = pinned_pieces_info[(row, col)]
-                    # Penalize having your pieces pinned (more penalty for valuable pieces)
-                    pin_penalty = piece_value * 0.15  # 15% penalty for being pinned
                     
-                    # Higher penalty if pinned to king
+                    pin_penalty = piece_value * 0.15  
+                    
+                   
                     if pin_info['is_king_pin']:
                         pin_penalty *= 1.3
                     
-                    # Apply the penalty
+                   
                     if square[0] == 'w':
                         score -= pin_penalty
                     else:

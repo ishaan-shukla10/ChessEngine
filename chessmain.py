@@ -229,12 +229,12 @@ def main():
 
 
 def playMoveSound(move, gs):
-    if move.isCapture:
+    if gs.inCheck():
+        p.mixer.Sound.play(SOUNDS["move-check"])
+    elif move.isCapture:
         p.mixer.Sound.play(SOUNDS["capture"])
     elif move.isCastleMove:
         p.mixer.Sound.play(SOUNDS["castle"])
-    elif gs.inCheck():
-        p.mixer.Sound.play(SOUNDS["move-check"])
     else:
         p.mixer.Sound.play(SOUNDS["move-self"])
 
