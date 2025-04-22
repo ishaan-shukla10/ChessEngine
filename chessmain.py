@@ -87,7 +87,6 @@ def main():
 
                         if len(playerClicks) == 2:
                             move = chessengine.Move(playerClicks[0], playerClicks[1], gs.board)
-                            #print(move.getChessNotation())
                             for i in range(len(validMoves)):
                                 if move == validMoves[i]:
                                     gs.makeMove(validMoves[i])
@@ -112,20 +111,19 @@ def main():
                         if (row, col) != dragged_piece_initial_pos:
                             start_row, start_col = dragged_piece_initial_pos
                             
-                            # Check if this is a pawn promotion move
                             isPawnPromotion = False
-                            promotionChoice = 'Q'  # Default
+                            promotionChoice = 'Q' 
                             
                             if gs.board[start_row][start_col][1] == 'p':
-                                # White pawn reaching the top row or black pawn reaching the bottom row
+                                
                                 if (gs.board[start_row][start_col][0] == 'w' and row == 0) or \
                                 (gs.board[start_row][start_col][0] == 'b' and row == 7):
                                     isPawnPromotion = True
-                                    # Get user's promotion choice
+                                    
                                     is_white = gs.board[start_row][start_col][0] == 'w'
                                     promotionChoice = drawPromotionSelection(screen, 2 if is_white else 1, col, is_white)
                             
-                            # Create move with promotion choice if applicable
+                           
                             move = chessengine.Move(dragged_piece_initial_pos, (row, col), gs.board, 
                                                 isPawnPromotion=isPawnPromotion, 
                                                 promotionChoice=promotionChoice)
@@ -134,7 +132,7 @@ def main():
                                 valid_move = validMoves[i]
                                 if move.startRow == valid_move.startRow and move.startCol == valid_move.startCol and \
                                 move.endRow == valid_move.endRow and move.endCol == valid_move.endCol:
-                                    # If this is a pawn promotion, update the valid move's promotion choice
+                                    
                                     if isPawnPromotion:
                                         validMoves[i].promotionChoice = promotionChoice
                                     
@@ -220,14 +218,11 @@ def main():
             gameOver = True
             if gs.whiteToMove:
                 drawEndGameText(screen, 'Black wins by checkmate')
-                p.mixer.Sound.play(SOUNDS["notify"])
             else:
                 drawEndGameText(screen, 'White wins by checkmate')
-                p.mixer.Sound.play(SOUNDS["notify"])
         elif gs.stalemate:
             gameOver = True
             drawEndGameText(screen, 'Stalemate')
-            p.mixer.Sound.play(SOUNDS["notify"])
 
         clock.tick(MAX_FPS)
         p.display.flip()
@@ -372,14 +367,13 @@ def drawPromotionSelection(screen, row, col, is_white):
     while waiting_for_selection:
         for e in p.event.get():
             if e.type == p.QUIT:
-                return 'Q'  # Default to queen if user quits
+                return 'Q' 
             elif e.type == p.MOUSEBUTTONDOWN:
                 location = p.mouse.get_pos()
                 click_col = location[0] // SQ_SIZE
                 click_row = location[1] // SQ_SIZE
                 
                 if click_col == col and row <= click_row < row + 4:
-                    # User clicked on a piece
                     selection_index = click_row - row
                     piece_type = pieces[selection_index][1]
                     p.mixer.Sound.play(SOUNDS["promote"])

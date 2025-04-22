@@ -64,7 +64,7 @@ piecePositionScores = {'N': knightScores, 'Q': queenScores, 'R': rookScores, 'B'
 
 CHECKMATE = 1000
 STALEMATE = 0
-DEPTH = 2
+DEPTH = 3
 
 
 
@@ -183,6 +183,10 @@ def findMoveNegaMaxAlphaBeta(gs, validMoves, depth, alpha, beta, turnMultiplier)
             if depth == DEPTH:
                 nextMove = move
                 print(move, score)
+                print("White attacks, ", gs.white_attacks)
+                print("White defends, ", gs.white_defends)
+                print("Black attacks, ", gs.black_attacks)
+                print("Black defends, ", gs.black_defends)
         gs.undoMove()
         if maxScore > alpha:
             alpha = maxScore
@@ -192,6 +196,9 @@ def findMoveNegaMaxAlphaBeta(gs, validMoves, depth, alpha, beta, turnMultiplier)
 
 
 def scoreBoard(gs):
+
+    heuristicScore = 0
+
     if gs.checkmate:
         if gs.whiteToMove:
             return -CHECKMATE
@@ -199,6 +206,18 @@ def scoreBoard(gs):
             return CHECKMATE
     elif gs.stalemate:
         return STALEMATE
+    
+    gs.whiteToMove = not gs.whiteToMove
+    if gs.inCheck():
+        heuristicScore += 0.1
+    gs.whiteToMove = not gs.whiteToMove
+
+    totalAttacks = gs.white_attacks['total'] if gs.whiteToMove else gs.black_attacks['total']
+    totalDefends = gs.white_defends['total'] if gs.whiteToMove else gs.black_defends['total']
+
+    heuristicScore += totalAttacks * 0.15
+    heuristicScore += totalDefends * 0.1
+
 
     score = 0
     for row in range(len(gs.board)):
@@ -212,9 +231,9 @@ def scoreBoard(gs):
                     else:
                         piecePositionScore = piecePositionScores[square[1]][row][col]
                 if square[0] == 'w':
-                    score += pieceScores[square[1]] + piecePositionScore * 0.1
+                    score += pieceScores[square[1]] + piecePositionScore * 0.1 + heuristicScore
                 elif square[0] == 'b':
-                    score -= pieceScores[square[1]] + piecePositionScore * 0.1
+                    score -= pieceScores[square[1]] + piecePositionScore * 0.1 + heuristicScore
     
     return score
 

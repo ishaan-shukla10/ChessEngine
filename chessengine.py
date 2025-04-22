@@ -35,12 +35,20 @@ class GameState():
             )
         ]
 
+        self.white_attacks = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
+        self.black_attacks = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
+        self.white_defends = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
+        self.black_defends = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
+
 
     def makeMove(self, move):
         self.board[move.startRow][move.startCol] = "--"
         self.board[move.endRow][move.endCol] = move.pieceMoved
         self.moveLog.append(move)
         self.whiteToMove = not self.whiteToMove
+
+        self.countAttacksAndDefends()
+
         if move.pieceMoved == 'wK':
             self.whiteKingLocation = (move.endRow, move.endCol)
         elif move.pieceMoved == 'bK':
@@ -84,6 +92,9 @@ class GameState():
             self.board[move.startRow][move.startCol] = move.pieceMoved
             self.board[move.endRow][move.endCol] = move.pieceCaptured
             self.whiteToMove = not self.whiteToMove
+
+            self.countAttacksAndDefends()
+
             if move.pieceMoved == 'wK':
                 self.whiteKingLocation = (move.startRow, move.startCol)
             elif move.pieceMoved == 'bK':
@@ -266,6 +277,105 @@ class GameState():
             if move.endRow == r and move.endCol == c:
                 return True
         
+
+
+
+    def countAttacksAndDefends(self):
+
+
+        self.white_attacks = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
+        self.white_defends = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
+        self.black_attacks = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
+        self.black_defends = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
+
+        for r in range(len(self.board)):
+            for c in range(len(self.board[r])):
+                piece = self.board[r][c]
+                if piece != '--':
+                    color = piece[0]
+                    piece_type = piece[1]
+
+                    attack_squares = self.getPieceAttackSquares(r, c)
+                    if attack_squares is not None:
+
+                        for square in attack_squares:
+                            target_r, target_c = square
+                            target_piece = self.board[target_r][target_c]
+
+                            if target_piece != '--':
+                                target_color = target_piece[0]
+
+                                if color != target_color:
+                                    if color == 'w':
+                                        self.white_attacks[piece_type] += 1
+                                        self.white_attacks["total"] += 1
+                                    else:
+                                        self.black_attacks[piece_type] += 1
+                                        self.black_attacks["total"] += 1
+                                else:
+                                    if color == 'w':
+                                        self.white_defends[piece_type] += 1
+                                        self.white_defends['total'] += 1
+                                    else:
+                                        self.black_defends[piece_type] += 1
+                                        self.black_defends['total'] += 1
+        
+        return (self.white_attacks, self.white_defends, self.black_attacks, self.black_defends)
+
+
+
+    def getPieceAttackSquares(self, r, c):
+        piece = self.board[r][c]
+        if piece == '--':
+            return []
+        
+        color = piece[0]
+        piece_type = piece[1]
+        attack_squares = []
+
+        if piece_type == 'p':
+            if color == 'w':  
+                if c-1 >= 0 and r-1 >= 0:  
+                    attack_squares.append((r-1, c-1))
+                if c+1 < 8 and r-1 >= 0:  
+                    attack_squares.append((r-1, c+1))
+            else:  
+                if c-1 >= 0 and r+1 < 8:  
+                    attack_squares.append((r+1, c-1))
+                if c+1 < 8 and r+1 < 8: 
+                    attack_squares.append((r+1, c+1))
+        
+        elif piece_type == 'N':
+            knight_moves = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]
+            for move in knight_moves:
+                end_row = r + move[0]
+                end_col = c + move[1]
+                if 0 <= end_row < 8 and 0 <= end_col < 8:
+                    attack_squares.append((end_row, end_col))
+
+        elif piece_type in ['B', 'R', 'Q', 'K']:
+            directions = []
+            if piece_type in ['B', 'Q']:  
+                directions.extend([(-1, -1), (-1, 1), (1, -1), (1, 1)])
+            if piece_type in ['R', 'Q']: 
+                directions.extend([(-1, 0), (0, -1), (1, 0), (0, 1)])
+            if piece_type == 'K': 
+                directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+
+            for d in directions:
+                for i in range(1, 8):
+                    end_row = r + d[0] * i
+                    end_col = c + d[1] * i
+                    if 0 <= end_row < 8 and 0 <= end_col < 8:
+                        attack_squares.append((end_row, end_col))
+                        if self.board[end_row][end_col] != '--' or piece_type == 'K':
+                            break
+                    else:
+                        break
+
+        return attack_squares
+
+
 
 
     def getAllPossibleMoves(self):
