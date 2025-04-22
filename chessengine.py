@@ -1,3 +1,8 @@
+from helper_functions import initMvvLva
+
+
+pieceScores = {'K': 0, 'p': 1, 'N': 3, 'B': 3, 'R': 5, 'Q': 9}
+
 class GameState():
     def __init__(self):
         self.board = [
@@ -39,6 +44,8 @@ class GameState():
         self.black_attacks = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
         self.white_defends = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
         self.black_defends = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
+
+        self.mvv_lva = initMvvLva()
 
 
     def makeMove(self, move):
@@ -120,6 +127,7 @@ class GameState():
             
             self.checkmate = False
             self.stalemate = False
+
 
     def checkForPinsAndChecks(self):
         pins = []
@@ -279,9 +287,158 @@ class GameState():
         
 
 
+    def detectAllPins(self):
+        pins = []
+
+        kingPins = self.detectPinsToRoyalPiece(isKing=True)
+        pins.extend(kingPins)
+
+        queenPins = self.detectPinsToRoyalPiece(isKing=False)
+        pins.extend(queenPins)
+
+        return pins
+    
+
+    def detectPinsToRoyalPiece(self, isKing=True):
+        pins = []
+
+        if self.whiteToMove:
+            allyColor = 'w'
+            enemyColor = 'b'
+        else:
+            allyColor = 'b'
+            enemyColor = 'w'
+
+        pieceLocation = None
+        if isKing:
+            pieceLocation = self.whiteKingLocation if self.whiteToMove else self.blackKingLocation
+        else:
+            for r in range(8):
+                for c in range(8):
+                    if self.board[r][c] == allyColor + 'Q':
+                        pieceLocation = (r, c)
+                        break
+                if pieceLocation:
+                    break
+            
+        if not pieceLocation:
+            return pins
+        
+        startRow, startCol = pieceLocation
+
+        directions = ((0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (-1, -1), (1, -1), (-1, 1))
+        for d in directions:
+            possiblePin = ()
+            for i in range(1, 8):
+                endRow = startRow + d[0] * i
+                endCol = startCol + d[1] * i
+            
+                if 0 <= endRow < 8 and 0 <= endCol < 8:
+                    endPiece = self.board[endRow][endCol]
+                
+                    if endPiece[0] == allyColor and (endPiece[1] != 'K' and endPiece[1] != 'Q'):
+                        if possiblePin == ():
+                            possiblePin = (endRow, endCol, d[0], d[1])
+                        else:
+                            break  
+                        
+                    elif endPiece[0] == enemyColor:
+                        piece_type = endPiece[1]
+                    
+                        valid_pin = False
+                    
+                    
+                        if 0 <= directions.index(d) <= 3:
+                            if piece_type == 'R' or piece_type == 'Q':
+                                valid_pin = True
+                    
+                        elif 4 <= directions.index(d) <= 7:
+                            if piece_type == 'B' or piece_type == 'Q':
+                                valid_pin = True
+                    
+                        if valid_pin and possiblePin != ():
+                            pins.append((possiblePin[0], possiblePin[1], possiblePin[2], possiblePin[3], isKing))
+                        break
+                    else:
+                        break
+                else:
+                    break
+    
+        return pins
+    
+
+    def scoreMove(self, move):
+        score = 0
+
+        self.makeMove(move)
+
+        self.whiteToMove = not self.whiteToMove
+        if self.inCheck():
+            score += 10000
+        self.whiteToMove = not self.whiteToMove
+
+        self.undoMove()
+
+        if move.isCapture:
+            attacker_piece = move.pieceMoved[1]
+            victim_piece = move.pieceCaptured[1]
+        
+            if attacker_piece in self.mvv_lva and victim_piece in self.mvv_lva[attacker_piece]:
+            # Use MVV-LVA table to score the capture
+                score += 1000 + self.mvv_lva[attacker_piece][victim_piece]
+            else:
+            # Fallback for any capture not in table
+                score += 1000
+
+        enemy_color = 'b' if self.whiteToMove else 'w'
+        r, c = move.endRow, move.endCol
+
+        piece_threatens = 0
+        attack_squares = self.getPieceAttackSquares(r, c)
+        if attack_squares:
+            for square in attack_squares:
+                target_r, target_c = square
+                if 0 <= target_r < 8 and 0 <= target_c < 8:
+                    target_piece = self.board[target_r][target_c]
+                    if target_piece != '--' and target_piece[0] == enemy_color:
+                    # Threaten score based on piece value
+                        piece_threatens += pieceScores.get(target_piece[1], 0) * 10
+    
+        score += piece_threatens
+
+        center_squares = [(3, 3), (3, 4), (4, 3), (4, 4)]
+        if (move.endRow, move.endCol) in center_squares:
+            score += 50  # Small bonus for controlling center
+
+        if move.pieceMoved[1] == 'p':
+        # Calculate how far the pawn has advanced
+            if self.whiteToMove:  # White pawns move up the board (decreasing row)
+                pawn_advance = 7 - move.endRow  # 7 is the starting row for white pawns
+            else:  # Black pawns move down the board (increasing row)
+                pawn_advance = move.endRow  # 0 is the starting row for black pawns
+        
+        # Higher bonus for pawns closer to promotion
+            score += pawn_advance * 10
+    
+    # 6. Bonus for castling
+        if move.isCastleMove:
+            score += 500  # Good bonus for castling
+    
+        return score
+    
+
+    def orderMoves(self, moves):
+        moveScores = []
+
+        for move in moves:
+            moveScores.append((move, self.scoreMove(move)))
+
+        moveScores.sort(key=lambda x: x[1], reverse=True)
+
+        return [move[0] for move in moveScores]
+
 
     def countAttacksAndDefends(self):
-
 
         self.white_attacks = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
         self.white_defends = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
@@ -374,6 +531,7 @@ class GameState():
                         break
 
         return attack_squares
+    
 
 
 

@@ -64,7 +64,7 @@ piecePositionScores = {'N': knightScores, 'Q': queenScores, 'R': rookScores, 'B'
 
 CHECKMATE = 1000
 STALEMATE = 0
-DEPTH = 3
+DEPTH = 2
 
 
 
@@ -113,9 +113,27 @@ def findBestMove(gs, validMoves, returnQueue):
     random.shuffle(validMoves)
     #findMoveMinMax(gs, validMoves, DEPTH, gs.whiteToMove)
     #findMoveNegaMax(gs, validMoves, DEPTH, 1 if gs.whiteToMove else -1)
-    findMoveNegaMaxAlphaBeta(gs, validMoves, DEPTH, -CHECKMATE, CHECKMATE, 1 if gs.whiteToMove else -1)
+
+    current_pins = gs.detectAllPins()
+    ordered_moves = gs.orderMoves(validMoves)
+
+    #validMoves.sort(key=lambda move: moveTargetsPinnedPiece(gs, move, current_pins), reverse=True)
+
+    findMoveNegaMaxAlphaBeta(gs, ordered_moves, DEPTH, -CHECKMATE, CHECKMATE, 1 if gs.whiteToMove else -1)
 
     returnQueue.put(nextMove) 
+
+
+
+def moveTargetsPinnedPiece(gs, move, pins):
+    pinned_squares = [(pin[0], pin[1]) for pin in pins]
+
+    if (move.endRow, move.endCol) in pinned_squares:
+        target_piece = gs.board[move.endRow][move.endCol]
+        if target_piece[1] != 'p':
+            return pieceScores[target_piece[1]]
+    
+    return 0
 
 
 
@@ -170,14 +188,20 @@ def findMoveNegaMax(gs, validMoves, depth, turnMultiplier):
 
 def findMoveNegaMaxAlphaBeta(gs, validMoves, depth, alpha, beta, turnMultiplier):
     global nextMove
+
     if depth == 0:
         return turnMultiplier * scoreBoard(gs)
     
+    if depth < DEPTH:
+        validMoves = gs.orderMoves(validMoves)
+
     maxScore = -CHECKMATE
     for move in validMoves:
         gs.makeMove(move)
         nextMoves = gs.getValidMoves()
         score = -findMoveNegaMaxAlphaBeta(gs, nextMoves, depth-1, -beta, -alpha, -turnMultiplier)
+        gs.undoMove()
+
         if score > maxScore:
             maxScore = score
             if depth == DEPTH:
@@ -187,17 +211,18 @@ def findMoveNegaMaxAlphaBeta(gs, validMoves, depth, alpha, beta, turnMultiplier)
                 print("White defends, ", gs.white_defends)
                 print("Black attacks, ", gs.black_attacks)
                 print("Black defends, ", gs.black_defends)
-        gs.undoMove()
+        
         if maxScore > alpha:
             alpha = maxScore
         if alpha >= beta:
             break
+
     return maxScore
 
 
 def scoreBoard(gs):
 
-    heuristicScore = 0
+    score = 0
 
     if gs.checkmate:
         if gs.whiteToMove:
@@ -207,19 +232,69 @@ def scoreBoard(gs):
     elif gs.stalemate:
         return STALEMATE
     
+    pins = gs.detectAllPins()
+    pinned_pieces = [(pin[0], pin[1]) for pin in pins]
+
+    pinned_pieces_info = {}
+    for pin in pins:
+        row, col = pin[0], pin[1]
+        piece = gs.board[row][col]
+        is_king_pin = pin[4]
+
+        pinned_pieces_info[(row, col)] = {
+            'piece': piece,
+            'is_king_pin': is_king_pin,
+            'direction': (pin[2], pin[3])
+        }
+
+    attacking_pinned_pieces = []
+    for r in range(8):
+        for c in range(8):
+            piece = gs.board[r][c]
+            if piece != '--':
+                if (gs.whiteToMove and piece[0] == 'w') or (not gs.whiteToMove and piece[0] == 'b'):
+                    # Get all squares this piece attacks
+                    attack_squares = gs.getPieceAttackSquares(r, c)
+                    if attack_squares:
+                        for square in attack_squares:
+                            if square in pinned_pieces:
+                                target_piece = gs.board[square[0]][square[1]]
+                                
+                                # Only worth targeting if not a pawn
+                                if target_piece[1] != 'p':
+                                    attacking_pinned_pieces.append({
+                                        'attacker': (r, c),
+                                        'target': square,
+                                        'piece_value': pieceScores[target_piece[1]],
+                                        'is_king_pin': pinned_pieces_info[square]['is_king_pin']
+                                    })
+
+    for attack in attacking_pinned_pieces:
+        pin_bonus = attack['piece_value'] * 0.3  # 30% of the piece value as bonus
+        
+        # Extra bonus if it's pinned to the king (more critical)
+        if attack['is_king_pin']:
+            pin_bonus *= 1.5
+            
+        # Apply the bonus
+        if gs.whiteToMove:
+            score += pin_bonus
+        else:
+            score -= pin_bonus
+    
     gs.whiteToMove = not gs.whiteToMove
     if gs.inCheck():
-        heuristicScore += 0.1
+        score += 0.2 if gs.whiteToMove else -0.2
     gs.whiteToMove = not gs.whiteToMove
 
     totalAttacks = gs.white_attacks['total'] if gs.whiteToMove else gs.black_attacks['total']
     totalDefends = gs.white_defends['total'] if gs.whiteToMove else gs.black_defends['total']
 
-    heuristicScore += totalAttacks * 0.15
-    heuristicScore += totalDefends * 0.1
+    if gs.whiteToMove:
+        score += totalAttacks * 0.15 + totalDefends * 0.1
+    else:
+        score -= totalAttacks * 0.15 + totalDefends * 0.1
 
-
-    score = 0
     for row in range(len(gs.board)):
         for col in range(len(gs.board[row])):
             square = gs.board[row][col]
@@ -230,10 +305,34 @@ def scoreBoard(gs):
                         piecePositionScore = piecePositionScores[square][row][col]
                     else:
                         piecePositionScore = piecePositionScores[square[1]][row][col]
+                
+                # Bonus for maintaining pins you've created
+                pin_maintainer_bonus = 0
+                if (row, col) in [attack['attacker'] for attack in attacking_pinned_pieces]:
+                    pin_maintainer_bonus = 0.5  # Bonus for piece that's pinning something
+                
+                # Apply position bonus
+                piece_value = pieceScores[square[1]]
                 if square[0] == 'w':
-                    score += pieceScores[square[1]] + piecePositionScore * 0.1 + heuristicScore
+                    score += piece_value + piecePositionScore * 0.1 + pin_maintainer_bonus
                 elif square[0] == 'b':
-                    score -= pieceScores[square[1]] + piecePositionScore * 0.1 + heuristicScore
+                    score -= piece_value + piecePositionScore * 0.1 + pin_maintainer_bonus
+                
+                # Special bonus/penalty for pinned pieces
+                if (row, col) in pinned_pieces:
+                    pin_info = pinned_pieces_info[(row, col)]
+                    # Penalize having your pieces pinned (more penalty for valuable pieces)
+                    pin_penalty = piece_value * 0.15  # 15% penalty for being pinned
+                    
+                    # Higher penalty if pinned to king
+                    if pin_info['is_king_pin']:
+                        pin_penalty *= 1.3
+                    
+                    # Apply the penalty
+                    if square[0] == 'w':
+                        score -= pin_penalty
+                    else:
+                        score += pin_penalty
     
     return score
 
