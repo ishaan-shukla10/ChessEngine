@@ -48,7 +48,7 @@ class GameState():
 
         if move.isPawnPromotion:
             # promotedPiece = input("Promote to Q, R, B or N: ")
-            promotedPiece = 'Q'
+            promotedPiece = move.promotionChoice
             self.board[move.endRow][move.endCol] = move.pieceMoved[0] + promotedPiece
 
         if move.isEnPassantMove:
@@ -143,7 +143,7 @@ class GameState():
                         type = endPiece[1]
 
                         if (0 <= j <= 3 and type == 'R') or (4 <= j <= 7 and type == 'B') or \
-                            (i==1 and type == 'p' and ((enemyColor == 'w' and 6 <= i <= 7) or (enemyColor == 'b' and 4 <= j <= 5))) or \
+                            (i==1 and type == 'p' and ((enemyColor == 'w' and 6 <= j <= 7) or (enemyColor == 'b' and 4 <= j <= 5))) or \
                             (type == 'Q') or (i == 1 and type == 'K'):
 
                             if possiblePin == ():
@@ -485,16 +485,18 @@ class Move():
     colsToFiles = {v:k for k,v in filesToCols.items()}
 
 
-    def __init__(self, startSq, endSq, board, isPawnPromotion = False, isEnPassantMove = False, isCastleMove = False):
+    def __init__(self, startSq, endSq, board, isPawnPromotion = False, isEnPassantMove = False, isCastleMove = False, promotionChoice='Q'):
         self.startRow = startSq[0]
         self.startCol = startSq[1]
         self.endRow = endSq[0]
         self.endCol = endSq[1]
         self.pieceMoved = board[self.startRow][self.startCol]
         self.pieceCaptured = board[self.endRow][self.endCol]
-        self.isCapture = self.pieceCaptured != "--"
-        self.isPawnPromotion = False
-        # self.promotionChoice = 'Q'
+        self.isCapture = (self.pieceCaptured != "--")
+        self.isPawnPromotion = isPawnPromotion
+        self.promotionChoice = promotionChoice
+
+
         if (self.pieceMoved == 'wp' and self.endRow == 0) or (self.pieceMoved == 'bp' and self.endRow == 7):
             self.isPawnPromotion = True
         

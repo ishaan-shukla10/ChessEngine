@@ -11,11 +11,19 @@ DIMENSION = 8
 SQ_SIZE = BOARD_HEIGHT // 8
 MAX_FPS = 15
 IMAGES = {}
+SOUNDS = {}
 
 def loadImages():
     pieces = ['wp', 'wR', 'wN', 'wB', 'wK', 'wQ', 'bp', 'bR', 'bN', 'bB', 'bK', 'bQ']
     for piece in pieces:
         IMAGES[piece] = p.transform.scale(p.image.load(f'images/{piece}.png'), (SQ_SIZE, SQ_SIZE))
+
+
+def loadSounds():
+    types = ["capture", "castle", "move-check", "move-self", "promote", "notify"]
+    for type in types:
+        SOUNDS[type] = p.mixer.Sound("sounds/" + type + ".mp3")
+
 
 def main():
     p.init()
@@ -30,6 +38,7 @@ def main():
     moveLogFont = p.font.SysFont("Arial", 14, False, False)
     
     loadImages()
+    loadSounds()
     running = True
     sqSelected = ()
     playerClicks = []
@@ -83,6 +92,7 @@ def main():
                                 if move == validMoves[i]:
                                     gs.makeMove(validMoves[i])
                                     moveMade = True
+                                    playMoveSound(move, gs)
                                     animate = True
                                     sqSelected = ()
                                     playerClicks = []
@@ -100,11 +110,37 @@ def main():
 
                     if 0 <= col < 8 and 0 <= row < 8:
                         if (row, col) != dragged_piece_initial_pos:
-                            move = chessengine.Move(dragged_piece_initial_pos, (row, col), gs.board)
+                            start_row, start_col = dragged_piece_initial_pos
+                            
+                            # Check if this is a pawn promotion move
+                            isPawnPromotion = False
+                            promotionChoice = 'Q'  # Default
+                            
+                            if gs.board[start_row][start_col][1] == 'p':
+                                # White pawn reaching the top row or black pawn reaching the bottom row
+                                if (gs.board[start_row][start_col][0] == 'w' and row == 0) or \
+                                (gs.board[start_row][start_col][0] == 'b' and row == 7):
+                                    isPawnPromotion = True
+                                    # Get user's promotion choice
+                                    is_white = gs.board[start_row][start_col][0] == 'w'
+                                    promotionChoice = drawPromotionSelection(screen, 2 if is_white else 1, col, is_white)
+                            
+                            # Create move with promotion choice if applicable
+                            move = chessengine.Move(dragged_piece_initial_pos, (row, col), gs.board, 
+                                                isPawnPromotion=isPawnPromotion, 
+                                                promotionChoice=promotionChoice)
+                            
                             for i in range(len(validMoves)):
-                                if move == validMoves[i]:
+                                valid_move = validMoves[i]
+                                if move.startRow == valid_move.startRow and move.startCol == valid_move.startCol and \
+                                move.endRow == valid_move.endRow and move.endCol == valid_move.endCol:
+                                    # If this is a pawn promotion, update the valid move's promotion choice
+                                    if isPawnPromotion:
+                                        validMoves[i].promotionChoice = promotionChoice
+                                    
                                     gs.makeMove(validMoves[i])
                                     moveMade = True
+                                    playMoveSound(move, gs)
                                     animate = False
                                     sqSelected = ()
                                     playerClicks = []
@@ -126,6 +162,7 @@ def main():
                 if e.key == p.K_z:
                     gs.undoMove()
                     moveMade = True
+                    playMoveSound(move, gs)
                     animate = False
                     gameOver = False
                     if AIThinking:
@@ -162,6 +199,8 @@ def main():
                     AIMove = smartmovefinder.findRandomMove(validMoves)
                 gs.makeMove(AIMove)
                 moveMade = True
+
+                playMoveSound(AIMove, gs)
                 animate = True
                 AIThinking = False
 
@@ -181,14 +220,28 @@ def main():
             gameOver = True
             if gs.whiteToMove:
                 drawEndGameText(screen, 'Black wins by checkmate')
+                p.mixer.Sound.play(SOUNDS["notify"])
             else:
                 drawEndGameText(screen, 'White wins by checkmate')
+                p.mixer.Sound.play(SOUNDS["notify"])
         elif gs.stalemate:
             gameOver = True
             drawEndGameText(screen, 'Stalemate')
+            p.mixer.Sound.play(SOUNDS["notify"])
 
         clock.tick(MAX_FPS)
         p.display.flip()
+
+
+def playMoveSound(move, gs):
+    if move.isCapture:
+        p.mixer.Sound.play(SOUNDS["capture"])
+    elif move.isCastleMove:
+        p.mixer.Sound.play(SOUNDS["castle"])
+    elif gs.inCheck():
+        p.mixer.Sound.play(SOUNDS["move-check"])
+    else:
+        p.mixer.Sound.play(SOUNDS["move-self"])
 
 
 def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_dragging=False, dragged_piece=None, dragged_piece_pos=()):
@@ -298,6 +351,39 @@ def animateMove(move, screen, sqSelected, board, clock):
         p.display.flip()
         clock.tick(60)
 
+
+def drawPromotionSelection(screen, row, col, is_white):
+    if is_white:
+        pieces = ['wQ', 'wR', 'wB', 'wN']
+    else:
+        pieces = ['bQ', 'bR', 'bB', 'bN']
+
+    selection_rect = p.Rect(col*SQ_SIZE, row*SQ_SIZE, SQ_SIZE, 4*SQ_SIZE)
+    p.draw.rect(screen, p.Color('gray'), selection_rect)
+    p.draw.rect(screen, p.Color('black'), selection_rect, 2)
+
+    for i, piece in enumerate(pieces):
+        piece_rect = p.Rect(col*SQ_SIZE, (row+i)*SQ_SIZE, SQ_SIZE, SQ_SIZE)
+        screen.blit(IMAGES[piece], piece_rect)
+
+    p.display.flip()
+
+    waiting_for_selection = True
+    while waiting_for_selection:
+        for e in p.event.get():
+            if e.type == p.QUIT:
+                return 'Q'  # Default to queen if user quits
+            elif e.type == p.MOUSEBUTTONDOWN:
+                location = p.mouse.get_pos()
+                click_col = location[0] // SQ_SIZE
+                click_row = location[1] // SQ_SIZE
+                
+                if click_col == col and row <= click_row < row + 4:
+                    # User clicked on a piece
+                    selection_index = click_row - row
+                    piece_type = pieces[selection_index][1]
+                    p.mixer.Sound.play(SOUNDS["promote"])
+                    return piece_type
 
 if __name__ == "__main__":
     main()
