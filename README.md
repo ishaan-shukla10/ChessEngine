@@ -10,10 +10,17 @@ You can find his original tutorials on his YouTube channel (search for "Eddie Sh
 Building upon Sharick's work, this code incorporates several improvements and new features:
 
 * **Improved AI:** The AI component has been significantly enhanced to provide a stronger and more challenging opponent. This includes modifications and additions to the search algorithms and evaluation functions.
+  1) Taught multiple openings to give the engine some background on opening theory.
+  2) Added heuristic scores for concepts of forks, pawn weaknesses (doubled pawns, isolated pawns) and king safety.
+  3) While searching for moves, engine follows the order of checks -> captures -> threats which is more intuitive and less time consuming.
+  4) Added the concept of MVV-LVA (most valuable piece - least valuable attacker), meaning that an attack with a pawn (1 point) on queen (9 points) holds much more importance than an attack of a queen on a pawn.
 * **Enhanced User Interaction:** The user interface (UI) has been revamped to offer a more intuitive and user-friendly experience when interacting with the chessboard.
-                                 This includes features like drag-and-drop moves, better visual feedback as well as easy on the eyes color combinations.
+  1) Easy-on-the-eyes board color
+  2) Drag and drop feature for pieces
+  3) Drawing arrows with RMB (right mouse button) for easier calculations during move making
+  4) Addition of sounds as per moves (different for castling, piece captures, piece movements and promotions)
 
-**Installation:**
+## Installation: ##
 
 1.  Clone this repository to your local machine:
     ```bash
@@ -25,7 +32,7 @@ Building upon Sharick's work, this code incorporates several improvements and ne
     pip install -r requirements.txt
     ```
 
-**Running the Engine:**
+## Running the Engine: ##
 
 1.  Navigate to the project directory in your terminal.
     ```bash
