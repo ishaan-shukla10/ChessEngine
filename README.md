@@ -18,6 +18,7 @@ Building upon Sharick's work, this code incorporates several improvements and ne
   1) Easy-on-the-eyes board color
   2) Drag and drop feature for pieces
   3) Drawing arrows with RMB (right mouse button) for easier calculations during move making
+  4) Addition of sounds as per moves (different for castling, piece captures, piece movements and promotions)
 
 ## Installation: ##
 
