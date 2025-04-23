@@ -10,8 +10,13 @@ You can find his original tutorials on his YouTube channel (search for "Eddie Sh
 Building upon Sharick's work, this code incorporates several improvements and new features:
 
 * **Improved AI:** The AI component has been significantly enhanced to provide a stronger and more challenging opponent. This includes modifications and additions to the search algorithms and evaluation functions.
+* 1) Taught multiple openings to give the engine some background on opening theory.
+  2) Added heuristic scores for concepts of forks, pawn weaknesses (doubled pawns, isolated pawns), king safety
+  3) While searching for moves, engine follows the order of checks -> captures -> threats which is more intuitive and less time consuming
 * **Enhanced User Interaction:** The user interface (UI) has been revamped to offer a more intuitive and user-friendly experience when interacting with the chessboard.
-                                 This includes features like drag-and-drop moves, better visual feedback as well as easy on the eyes color combinations.
+* 1) Easy-on-the-eyes board color
+  2) Drag and drop feature for pieces
+  3) Drawing arrows with RMB (right mouse button) for easier calculations during move making
 
 **Installation:**
 
