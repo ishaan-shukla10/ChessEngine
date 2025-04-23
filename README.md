@@ -19,7 +19,7 @@ Building upon Sharick's work, this code incorporates several improvements and ne
   2) Drag and drop feature for pieces
   3) Drawing arrows with RMB (right mouse button) for easier calculations during move making
 
-**Installation:**
+## Installation: ##
 
 1.  Clone this repository to your local machine:
     ```bash
@@ -31,7 +31,7 @@ Building upon Sharick's work, this code incorporates several improvements and ne
     pip install -r requirements.txt
     ```
 
-**Running the Engine:**
+## Running the Engine: ##
 
 1.  Navigate to the project directory in your terminal.
     ```bash
