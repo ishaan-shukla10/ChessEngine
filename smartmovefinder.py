@@ -353,12 +353,7 @@ def scoreMaterial(board):
     return score
 
 
-# Add this function to record moves into the opening book
 def record_move_to_opening_book(gs, move, quality=1):
-    """
-    Record a move to the opening book
-    This can be called after each move in a game if you want to learn from gameplay
-    """
     if len(gs.moveLog) <= MAX_BOOK_MOVE:
         position_hash = opening_book.add_position(gs.board, move, quality)
         print(f"Added position {position_hash} to opening book")
