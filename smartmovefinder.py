@@ -115,7 +115,7 @@ def findBestMove(gs, validMoves, returnQueue):
     
     if USE_OPENING_BOOK and len(gs.moveLog) < MAX_BOOK_MOVE:
         book_move = opening_book.get_book_move(gs.board, gs.whiteToMove, gs.currentCastlingRights, 
-                                            gs.enPassantPossible[1] if gs.enPassantPossible else -1, selection_mode = "random")
+                                            gs.enPassantPossible[1] if gs.enPassantPossible else -1, selection_mode = "mixed")
         if book_move:
             print("Using book move:", book_move.getChessNotation())
             returnQueue.put(book_move)

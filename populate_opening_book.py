@@ -171,7 +171,17 @@ class PgnParser:
             return None
         
 
-                    
+        if len(move_text) == 5 and move_text[0] in 'NBRQK' and move_text[1] in 'abcdefgh' and move_text[2] == 'x' and move_text[3] in 'abcdefgh' and move_text[4] in '12345678':
+            piece_type = move_text[0]
+            file_char, rank_char = move_text[3], move_text[4]
+            end_col = ord(file_char) - ord('a')
+            end_row = 8 - int(rank_char)
+
+            for valid_move in valid_moves:
+                if valid_move.pieceMoved[1] == piece_type and valid_move.endRow == end_row and valid_move.endCol == end_col and valid_move.isCapture:
+                    return valid_move
+
+
         
         if len(move_text) == 4 and move_text[0] in 'NBRQK' and move_text[1] == 'x' and move_text[2] in 'abcdefgh' and str(move_text[3]) in '12345678':
             piece_type, file_char, rank_char = move_text[0], move_text[2], move_text[3]

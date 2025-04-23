@@ -15,4 +15,4 @@ heuristics like rook on open files, bishop and queen pins
 Transposition table and zorbius hashing
 do not repeat moves if materially up (3 move and 50 move rules)
 attack only if num attackers on a piece > num defenders
-training from 10th opening  
+training from 10th opening (right now only first 10 opening moves from openings, also quality given = 2.0)
