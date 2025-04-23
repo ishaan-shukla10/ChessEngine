@@ -1,10 +1,10 @@
-tell it that pins are good
-adding pressure to pin
+tell it that pins are good - done
+adding pressure to pin - done
 attack unprotected pawns (concept of weakness)
 double/ isolated pawn weaknesses
-king protection points
+king protection points - done
 striking at center at start of game
-adding points for pins/checks
+adding points for pins/checks - done
 teaching forks
 exchange pieces if materially up
 do not stalemate if materially up
@@ -13,3 +13,6 @@ chess notations update for pawn promotion and cases like Nbd2
 concept of batteries
 heuristics like rook on open files, bishop and queen pins
 Transposition table and zorbius hashing
+do not repeat moves if materially up (3 move and 50 move rules)
+attack only if num attackers on a piece > num defenders
+training from 10th opening  

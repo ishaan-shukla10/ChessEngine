@@ -782,8 +782,71 @@ class Move():
             return self.moveID == other.moveID
         return False
     
-    def getChessNotation(self):
-        return self.getRankFile(self.startRow, self.startCol) + self.getRankFile(self.endRow, self.endCol)
+    def getChessNotation(self, board=None, getAllPossibleMoves=None):
+        #return self.getRankFile(self.startRow, self.startCol) + self.getRankFile(self.endRow, self.endCol)
+        """
+    Returns the move in modern algebraic chess notation with disambiguation if needed.
+    This method should be called after all moves are generated, by passing the board and a function
+    to get all possible moves.
+    """
+    # Special case for castling
+        if self.isCastleMove:
+            return "O-O" if self.endCol == 6 else "O-O-O"
+    
+    # Start with piece letter (except for pawns)
+        moveString = ""
+        if self.pieceMoved[1] != 'p':
+            moveString = self.pieceMoved[1]
+        
+        # Check for disambiguation only if board and getAllPossibleMoves are provided
+            if board is not None and getAllPossibleMoves is not None:
+                sameTypePiecesToSameSquare = []
+                color = self.pieceMoved[0]
+                piece_type = self.pieceMoved[1]
+            
+            # Find all pieces of the same type that can move to the destination
+                for r in range(8):
+                    for c in range(8):
+                        if board[r][c] == color + piece_type and (r, c) != (self.startRow, self.startCol):
+                        # Check if this piece can move to the same destination
+                        # This is a simplified check and might need to be adapted
+                            possibleMoves = []
+                            getAllPossibleMoves(r, c, possibleMoves)
+                            for move in possibleMoves:
+                                if move.endRow == self.endRow and move.endCol == self.endCol:
+                                    sameTypePiecesToSameSquare.append((r, c))
+            
+            # If we found other pieces that can move to the same square, add disambiguation
+                if sameTypePiecesToSameSquare:
+                    sameFile = any(c == self.startCol for r, c in sameTypePiecesToSameSquare)
+                    sameRank = any(r == self.startRow for r, c in sameTypePiecesToSameSquare)
+                
+                    if not sameFile:
+                        # If no piece shares the same file, just add the file
+                        moveString += self.colsToFiles[self.startCol]
+                    elif not sameRank:
+                    # If no piece shares the same rank, just add the rank
+                        moveString += self.rowsToRanks[self.startRow]
+                    else:
+                    # If there are pieces sharing both rank and file, add both
+                        moveString += self.colsToFiles[self.startCol] + self.rowsToRanks[self.startRow]
+    
+    # For pawn captures, we need the starting file
+        elif self.pieceMoved[1] == 'p' and self.isCapture:
+            moveString = self.colsToFiles[self.startCol]
+    
+    # Add 'x' for captures
+        if self.isCapture:
+            moveString += 'x'
+    
+    # Add destination square
+        moveString += self.getRankFile(self.endRow, self.endCol)
+    
+    # Add promotion piece if applicable
+        if self.isPawnPromotion:
+            moveString += '=' + self.promotionChoice
+    
+        return moveString
     
     
     def getRankFile(self, r, c):
@@ -792,17 +855,25 @@ class Move():
     def __str__(self):
         if self.isCastleMove:
             return "O-O" if self.endCol == 6 else "O-O-O"
-        
-        endSquare = self.getRankFile(self.endRow, self.endCol)
-        if self.pieceMoved[1] == 'p':
-            if self.isCapture:
-                return self.colsToFiles[self.startCol] + 'x' + endSquare
-            else:
-                return endSquare
-        
-        moveString = self.pieceMoved[1]
-
+    
+    # Start with piece letter (except for pawns)
+        moveString = ""
+        if self.pieceMoved[1] != 'p':
+            moveString = self.pieceMoved[1]
+    
+    # For pawn captures, we need the starting file
+        elif self.pieceMoved[1] == 'p' and self.isCapture:
+            moveString = self.colsToFiles[self.startCol]
+    
+    # Add 'x' for captures
         if self.isCapture:
             moveString += 'x'
-        
-        return moveString + endSquare
+    
+    # Add destination square
+        moveString += self.getRankFile(self.endRow, self.endCol)
+    
+    # Add promotion piece if applicable
+        if self.isPawnPromotion:
+            moveString += '=' + self.promotionChoice
+    
+        return moveString

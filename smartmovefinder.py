@@ -1,6 +1,5 @@
 import random
-
-
+from openingbook import OpeningBook
 
 pieceScores = {'K': 0, 'p': 1, 'N': 3, 'B': 3, 'R': 5, 'Q': 9}
 
@@ -64,9 +63,13 @@ piecePositionScores = {'N': knightScores, 'Q': queenScores, 'R': rookScores, 'B'
 
 CHECKMATE = 1000
 STALEMATE = 0
-DEPTH = 2
+DEPTH = 3
 
 
+
+opening_book = OpeningBook()
+USE_OPENING_BOOK = True
+MAX_BOOK_MOVE = 10  
 
 def findRandomMove(validMoves):
     return validMoves[random.randint(0, len(validMoves)-1)]
@@ -106,23 +109,26 @@ def findGreedyMove(gs, validMoves):
     return bestPlayerMove
 
 
-
 def findBestMove(gs, validMoves, returnQueue):
     global nextMove
     nextMove = None
+    
+    if USE_OPENING_BOOK and len(gs.moveLog) < MAX_BOOK_MOVE:
+        book_move = opening_book.get_book_move(gs.board, gs.whiteToMove, gs.currentCastlingRights, 
+                                            gs.enPassantPossible[1] if gs.enPassantPossible else -1, selection_mode = "random")
+        if book_move:
+            print("Using book move:", book_move.getChessNotation())
+            returnQueue.put(book_move)
+            return
+    
     random.shuffle(validMoves)
-    #findMoveMinMax(gs, validMoves, DEPTH, gs.whiteToMove)
-    #findMoveNegaMax(gs, validMoves, DEPTH, 1 if gs.whiteToMove else -1)
-
+    
     current_pins = gs.detectAllPins()
     ordered_moves = gs.orderMoves(validMoves)
-
-    #validMoves.sort(key=lambda move: moveTargetsPinnedPiece(gs, move, current_pins), reverse=True)
 
     findMoveNegaMaxAlphaBeta(gs, ordered_moves, DEPTH, -CHECKMATE, CHECKMATE, 1 if gs.whiteToMove else -1)
 
     returnQueue.put(nextMove) 
-
 
 
 def moveTargetsPinnedPiece(gs, move, pins):
@@ -134,7 +140,6 @@ def moveTargetsPinnedPiece(gs, move, pins):
             return pieceScores[target_piece[1]]
     
     return 0
-
 
 
 def findMoveMinMax(gs, validMoves, depth, whiteToMove):
@@ -166,7 +171,6 @@ def findMoveMinMax(gs, validMoves, depth, whiteToMove):
                     nextMove = move
             gs.undoMove()
         return minScore
-
 
 
 def findMoveNegaMax(gs, validMoves, depth, turnMultiplier):
@@ -337,8 +341,6 @@ def scoreBoard(gs):
     return score
 
 
-
-
 def scoreMaterial(board):
     score = 0
     for row in board:
@@ -349,3 +351,15 @@ def scoreMaterial(board):
                 score -= pieceScores[square[1]]
 
     return score
+
+
+# Add this function to record moves into the opening book
+def record_move_to_opening_book(gs, move, quality=1):
+    """
+    Record a move to the opening book
+    This can be called after each move in a game if you want to learn from gameplay
+    """
+    if len(gs.moveLog) <= MAX_BOOK_MOVE:
+        position_hash = opening_book.add_position(gs.board, move, quality)
+        print(f"Added position {position_hash} to opening book")
+        opening_book.save_book()
