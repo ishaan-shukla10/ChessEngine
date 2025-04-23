@@ -11,8 +11,9 @@ Building upon Sharick's work, this code incorporates several improvements and ne
 
 * **Improved AI:** The AI component has been significantly enhanced to provide a stronger and more challenging opponent. This includes modifications and additions to the search algorithms and evaluation functions.
   1) Taught multiple openings to give the engine some background on opening theory.
-  2) Added heuristic scores for concepts of forks, pawn weaknesses (doubled pawns, isolated pawns), king safety
-  3) While searching for moves, engine follows the order of checks -> captures -> threats which is more intuitive and less time consuming
+  2) Added heuristic scores for concepts of forks, pawn weaknesses (doubled pawns, isolated pawns) and king safety.
+  3) While searching for moves, engine follows the order of checks -> captures -> threats which is more intuitive and less time consuming.
+  4) Added the concept of MVV-LVA (most valuable piece - least valuable attacker), meaning that an attack with a pawn (1 point) on queen (9 points) holds much more importance than an attack of a queen on a pawn.
 * **Enhanced User Interaction:** The user interface (UI) has been revamped to offer a more intuitive and user-friendly experience when interacting with the chessboard.
   1) Easy-on-the-eyes board color
   2) Drag and drop feature for pieces
