@@ -2,7 +2,7 @@ import json
 import os
 import random
 from zobrist_hash import ZobristHash
-from chessengine import Move 
+from chessengine import Move
 
 class OpeningBook:
     def __init__(self, book_file="opening_book.json"):

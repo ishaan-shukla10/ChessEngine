@@ -92,15 +92,17 @@ class PgnParser:
         except Exception as e:
             print(f"Error parsing PGN file {file_path}: {str(e)}")
             return []
+        
 
     def find_matching_move(self, move_text, valid_moves):
+
         
         for valid_move in valid_moves:
             if valid_move.getChessNotation() == move_text:
                 return valid_move
         
         
-        if len(move_text) == 2 and move_text[0] in 'abcdefgh' and move_text[1] in '12345678':
+        if len(move_text) == 2 and move_text[0] in 'abcdefgh' and str(move_text[1]) in '12345678':
             file_char, rank_char = move_text[0], move_text[1]
             end_col = ord(file_char) - ord('a')
             end_row = 8 - int(rank_char)
@@ -109,9 +111,25 @@ class PgnParser:
             for valid_move in valid_moves:
                 if valid_move.pieceMoved[1] == 'p' and valid_move.endRow == end_row and valid_move.endCol == end_col:
                     return valid_move
+                
+        if len(move_text) >= 4 and move_text[1] == 'x':
+            start_file = move_text[0]
+            end_file = move_text[2]
+            end_rank = move_text[3]
+            start_col = ord(start_file) - ord('a')
+            end_col = ord(end_file) - ord('a')
+            end_row = 8 - int(end_rank)
+            
+            for valid_move in valid_moves:
+                # Check if it's an en passant move with matching coordinates
+                if (valid_move.isEnPassantMove and 
+                    valid_move.startCol == start_col and 
+                    valid_move.endCol == end_col and 
+                    valid_move.endRow == end_row):
+                    return valid_move
         
         
-        if len(move_text) == 4 and move_text[0] in 'abcdefgh' and move_text[1] == 'x' and move_text[2] in 'abcdefgh' and move_text[3] in '12345678':
+        if len(move_text) == 4 and move_text[0] in 'abcdefgh' and move_text[1] == 'x' and move_text[2] in 'abcdefgh' and str(move_text[3]) in '12345678':
             start_file, end_file, rank_char = move_text[0], move_text[2], move_text[3]
             start_col = ord(start_file) - ord('a')
             end_col = ord(end_file) - ord('a')
@@ -124,7 +142,7 @@ class PgnParser:
                     return valid_move
         
         
-        if len(move_text) == 3 and move_text[0] in 'NBRQK' and move_text[1] in 'abcdefgh' and move_text[2] in '12345678':
+        if len(move_text) == 3 and move_text[0] in 'NBRQK' and move_text[1] in 'abcdefgh' and str(move_text[2]) in '12345678':
             piece_type, file_char, rank_char = move_text[0], move_text[1], move_text[2]
             end_col = ord(file_char) - ord('a')
             end_row = 8 - int(rank_char)
@@ -135,23 +153,27 @@ class PgnParser:
                     return valid_move
                 
         
-        if len(move_text) == 4 and move_text[0] in 'NBRQK' and move_text[1] in 'abcdefgh' and move_text[2] in 'abcdefgh' and move_text[3] in '12345678':
-            piece_type, from_file, to_file, rank_char = move_text[0], move_text[1], move_text[2], move_text[3]
-            from_col = ord(from_file) - ord('a')
-            end_col = ord(to_file) - ord('a')
+        if len(move_text) == 4 and move_text[0] in 'NBRQK' and move_text[1] in 'abcdefgh12345678' and move_text[2] in 'abcdefgh' and move_text[3] in '12345678':
+            piece_type = move_text[0]
+            file_char, rank_char = move_text[2], move_text[3]
+            disambig = move_text[1]
+            end_col = ord(file_char) - ord('a')
             end_row = 8 - int(rank_char)
-    
+            
             for valid_move in valid_moves:
-                if (valid_move.pieceMoved[1] == piece_type and 
-                    valid_move.startCol == from_col and
-                    valid_move.endRow == end_row and 
-                    valid_move.endCol == end_col):
-                    return valid_move
+                if valid_move.pieceMoved[1] == piece_type and valid_move.endRow == end_row and valid_move.endCol == end_col:
+                    # File disambiguation
+                    if disambig in 'abcdefgh' and valid_move.startCol == ord(disambig) - ord('a'):
+                        return valid_move
+                    # Rank disambiguation
+                    elif disambig in '12345678' and valid_move.startRow == 8 - int(disambig):
+                        return valid_move
+            return None
         
 
                     
         
-        if len(move_text) == 4 and move_text[0] in 'NBRQK' and move_text[1] == 'x' and move_text[2] in 'abcdefgh' and move_text[3] in '12345678':
+        if len(move_text) == 4 and move_text[0] in 'NBRQK' and move_text[1] == 'x' and move_text[2] in 'abcdefgh' and str(move_text[3]) in '12345678':
             piece_type, file_char, rank_char = move_text[0], move_text[2], move_text[3]
             end_col = ord(file_char) - ord('a')
             end_row = 8 - int(rank_char)
@@ -178,7 +200,7 @@ class PgnParser:
         
         return None
 
-def import_pgn_game_improved(parser, game_moves, opening_book, max_moves=15, quality=1):
+def import_pgn_game_improved(parser, game_moves, opening_book, game_number, max_moves=15, quality=1):
     
     gs = GameState()
     moves_imported = 0
@@ -200,8 +222,12 @@ def import_pgn_game_improved(parser, game_moves, opening_book, max_moves=15, qua
             gs.makeMove(found_move)
             moves_imported += 1
         else:
-            print(f"Move not recognized: {move_text}")
+            print(print(f"Error in Game {game_number+1}, PGN move {i+1}: {move_text}"))
+            print(f"PGN move {i+1}: {move_text}")
+            print(f"Move not recognized: {move_text}, len: {len(move_text)}")
+            print(f"Valid moves: {[m.getChessNotation() for m in valid_moves]}")
             break
+
     
     return moves_imported
 
@@ -233,7 +259,7 @@ def populate_from_directory(directory_path, max_moves=15, quality=1):
         file_moves = 0
         
         for i, game_moves in enumerate(games):
-            moves_imported = import_pgn_game_improved(parser, game_moves, book, max_moves, quality)
+            moves_imported = import_pgn_game_improved(parser, game_moves, book, games_processed, max_moves, quality)
             file_moves += moves_imported
             total_moves += moves_imported
             games_processed += 1

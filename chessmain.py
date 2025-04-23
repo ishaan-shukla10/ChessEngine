@@ -44,7 +44,7 @@ def main():
     playerClicks = []
     gameOver = False
     playerOne = True
-    playerTwo = False
+    playerTwo = True
     AIThinking = False
     moveFinderProcess = None
     moveUndone = False
