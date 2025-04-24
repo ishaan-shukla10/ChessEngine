@@ -10,7 +10,7 @@ You can find his original tutorials on his YouTube channel (search for "Eddie Sh
 Building upon Sharick's work, this code incorporates several improvements and new features:
 
 * **Improved AI:** The AI component has been significantly enhanced to provide a stronger and more challenging opponent. This includes modifications and additions to the search algorithms and evaluation functions.
-  1) Taught multiple openings to give the engine some background on opening theory.
+  1) Taught multiple openings to give the engine some background on opening theory, by storing most frequently obtained positions after standard openings.
   2) Added heuristic scores for concepts of forks, pawn weaknesses (doubled pawns, isolated pawns) and king safety.
   3) While searching for moves, engine follows the order of checks -> captures -> threats which is more intuitive and less time consuming.
   4) Added the concept of MVV-LVA (most valuable piece - least valuable attacker), meaning that an attack with a pawn (1 point) on queen (9 points) holds much more importance than an attack of a queen on a pawn.
