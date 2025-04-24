@@ -6,7 +6,6 @@ from multiprocessing import Process, Queue
 '''
 Variables defined globally to be used in functions
 '''
-
 BOARD_WIDTH = BOARD_HEIGHT = 512
 MOVE_LOG_PANEL_WIDTH = 250
 MOVE_LOG_PANEL_HEIGHT = BOARD_HEIGHT
@@ -20,7 +19,6 @@ SOUNDS = {}
 '''
 Load Images of pieces from directory using pygame
 '''
-
 def loadImages():
     pieces = ['wp', 'wR', 'wN', 'wB', 'wK', 'wQ', 'bp', 'bR', 'bN', 'bB', 'bK', 'bQ']
     for piece in pieces:
@@ -30,7 +28,6 @@ def loadImages():
 '''
 Load sounds for different piece movements 
 '''
-
 def loadSounds():
     types = ["capture", "castle", "move-check", "move-self", "promote", "notify"]
     for type in types:
@@ -263,7 +260,9 @@ def main():
         p.display.flip()
 
 
-# play sounds according to type of each move
+'''
+play sounds according to type of each move
+''' 
 def playMoveSound(move, gs):
     if gs.inCheck():
         p.mixer.Sound.play(SOUNDS["move-check"])
@@ -274,7 +273,9 @@ def playMoveSound(move, gs):
     else:
         p.mixer.Sound.play(SOUNDS["move-self"])
 
-# draw board, highlighted squares if clicked, pieces, move log and notation helpers
+'''
+draw board, highlighted squares if clicked, pieces, move log and notation helpers
+'''
 def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_dragging=False, dragged_piece=None, dragged_piece_pos=()):
     drawBoard(screen)
     highlightSquares(screen, gs, validMoves, sqSelected)
@@ -282,8 +283,9 @@ def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_draggin
     drawMoveLog(screen, gs, moveLogFont)
     drawNotationHelper(screen)
 
-
-# draw 8 x 8 chessboard
+'''
+draw 8 x 8 chessboard
+'''
 def drawBoard(screen):
     global colors
     colors = [p.Color(241, 207, 167), p.Color(186, 99, 52)]
@@ -292,8 +294,9 @@ def drawBoard(screen):
             color = colors[((r+c)%2)]
             p.draw.rect(screen, color, p.Rect(NOTATION_WIDTH_VT + c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
-
-# highlight valid moves when clicked on a piece
+'''
+highlight valid moves when clicked on a piece
+'''
 def highlightSquares(screen, gs, validMoves, sqSelected):
     if sqSelected != ():
         r, c = sqSelected
@@ -308,8 +311,9 @@ def highlightSquares(screen, gs, validMoves, sqSelected):
                     if move.startRow == r and move.startCol == c:
                         screen.blit(s, (NOTATION_WIDTH_VT + move.endCol*SQ_SIZE, move.endRow*SQ_SIZE))
 
-
-# draw pieces on top of board and highlight squares
+'''
+draw pieces on top of board and highlight squares
+'''
 def drawPieces(screen, board, sqSelected, piece_dragging=False, dragged_piece=None, dragged_piece_pos=()):
     for r in range(DIMENSION):
         for c in range(DIMENSION):
@@ -324,8 +328,9 @@ def drawPieces(screen, board, sqSelected, piece_dragging=False, dragged_piece=No
         y = min(max(dragged_piece_pos[1] - SQ_SIZE//2, 0), BOARD_HEIGHT - SQ_SIZE)
         screen.blit(IMAGES[dragged_piece], p.Rect(x, y, SQ_SIZE, SQ_SIZE))
 
-
-# draw notation helper (1-8) vertically and (a-h) horizontally
+'''
+draw notation helper (1-8) vertically and (a-h) horizontally
+'''
 def drawNotationHelper(screen):
     font = p.font.SysFont("Georgia", 16, False, False)
 
@@ -350,8 +355,9 @@ def drawNotationHelper(screen):
     notation_corner = p.Rect(0, BOARD_HEIGHT, NOTATION_WIDTH_VT, NOTATION_HEIGHT_HZ)
     p.draw.rect(screen, p.Color('white'), notation_corner)
 
-
-# draw move log to see series of moves that lead to current position in game
+'''
+draw move log to see series of moves that lead to current position in game
+'''
 def drawMoveLog(screen, gs, font):
     moveLogRect = p.Rect(BOARD_WIDTH + NOTATION_WIDTH_VT, 0, MOVE_LOG_PANEL_WIDTH, MOVE_LOG_PANEL_HEIGHT)
     p.draw.rect(screen, p.Color("Black"), moveLogRect)
@@ -376,8 +382,9 @@ def drawMoveLog(screen, gs, font):
         screen.blit(textObject, textLocation)
         textY += textObject.get_height() + lineSpacing
 
-
-# draw text in the middle of the board after game is over
+'''
+draw text in the middle of the board after game is over
+'''
 def drawEndGameText(screen, text):
     font = p.font.SysFont("Helvetica", 32, True, False)
     textObject = font.render(text, 0, p.Color('Gray'))
@@ -386,8 +393,9 @@ def drawEndGameText(screen, text):
     textObject = font.render(text, 0, p.Color('Black'))
     screen.blit(textObject, textLocation.move(2, 2))
 
-
-# animate pieces going from one square to another
+'''
+animate pieces going from one square to another
+'''
 def animateMove(move, screen, sqSelected, board, clock):
     global colors
     coords = []
@@ -409,7 +417,9 @@ def animateMove(move, screen, sqSelected, board, clock):
         p.display.flip()
         clock.tick(60)
 
-# UI aided selection of piece to promote to, once pawn reaches back rank
+'''
+UI aided selection of piece to promote to, once pawn reaches back rank
+'''
 def drawPromotionSelection(screen, row, col, is_white):
     if is_white:
         pieces = ['wQ', 'wR', 'wB', 'wN']
