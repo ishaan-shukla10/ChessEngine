@@ -60,10 +60,17 @@ def main():
     playerClicks = [] # log of clicks made by player
     gameOver = False
     playerOne = True # For white player, if true -> no computer
-    playerTwo = False # For black player, if false -> computer plays
+    playerTwo = True # For black player, if true -> human plays (changed to True by default)
     AIThinking = False
     moveFinderProcess = None
     moveUndone = False
+    moveLogScroll = 0
+    maxScroll = 0
+    
+    # Added variables for board flipping
+    boardFlipped = False # Track if board is currently flipped (False = white's POV, True = black's POV)
+    autoFlip = True # If True, board will flip automatically after each move
+    fixedBlackPOV = not playerOne and playerTwo # If True, board will stay in black's POV
 
     # necessary variables for dragging and dropping pieces
     piece_dragging = False
@@ -83,10 +90,16 @@ def main():
             # detect mouse clicks and movements
             elif e.type == p.MOUSEBUTTONDOWN:
                     if not gameOver and humanTurn and e.button == 1: # LMB clicks and drags
-
                         location = p.mouse.get_pos() # get current location of mouse cursor click
-                        col = (location[0] - NOTATION_WIDTH_VT) //SQ_SIZE # detect column
-                        row = location[1]//SQ_SIZE # detect row
+                        
+                        # Adjust column based on board orientation
+                        col = (location[0] - NOTATION_WIDTH_VT) // SQ_SIZE
+                        row = location[1] // SQ_SIZE
+                        
+                        # Convert coordinates if board is flipped
+                        if boardFlipped:
+                            col = 7 - col
+                            row = 7 - row
                         
                         if 0 <= col < 8 and 0 <= row < 8: # if bounds satisfied detect square
                             piece = gs.board[row][col]
@@ -118,6 +131,10 @@ def main():
                                     sqSelected = () 
                                     playerClicks = []
                                     piece_dragging = False
+                                    
+                                    # Flip board based on settings after a move is made
+                                    if autoFlip and not fixedBlackPOV:
+                                        boardFlipped = not boardFlipped
                                     break
 
                             if not moveMade: # if no move made, retain the first square selected
@@ -127,8 +144,13 @@ def main():
             elif e.type == p.MOUSEBUTTONUP:
                 if piece_dragging and e.button == 1: # if was LMB
                     location = p.mouse.get_pos()
-                    col = (location[0] - NOTATION_WIDTH_VT) //SQ_SIZE
-                    row = location[1]//SQ_SIZE
+                    col = (location[0] - NOTATION_WIDTH_VT) // SQ_SIZE
+                    row = location[1] // SQ_SIZE
+                    
+                    # Convert coordinates if board is flipped
+                    if boardFlipped:
+                        col = 7 - col
+                        row = 7 - row
 
                     # if within bounds, drag the piece
                     if 0 <= col < 8 and 0 <= row < 8:
@@ -146,7 +168,12 @@ def main():
                                     isPawnPromotion = True
                                     
                                     is_white = gs.board[start_row][start_col][0] == 'w'
-                                    promotionChoice = drawPromotionSelection(screen, 2 if is_white else 1, col, is_white)
+                                    # Adjust promotion UI based on board orientation
+                                    promo_col = col if not boardFlipped else 7 - col
+                                    promo_row = 2 if is_white else 1
+                                    if boardFlipped:
+                                        promo_row = 7 - promo_row
+                                    promotionChoice = drawPromotionSelection(screen, promo_row, promo_col, is_white, boardFlipped)
                             
                            # set the move after dropping
                             move = chessengine.Move(dragged_piece_initial_pos, (row, col), gs.board, 
@@ -170,6 +197,10 @@ def main():
                                     animate = False
                                     sqSelected = ()
                                     playerClicks = []
+                                    
+                                    # Flip board based on settings after a move is made
+                                    if autoFlip and not fixedBlackPOV:
+                                        boardFlipped = not boardFlipped
                                     break
                     
                     # reset all dragging variables after dropping it
@@ -191,13 +222,16 @@ def main():
                 if e.key == p.K_z: # if Z key pressed
                     gs.undoMove() # undo last move
                     moveMade = True
-                    playMoveSound(move, gs)
                     animate = False
                     gameOver = False
                     if AIThinking: # if computer was calculating, terminate the process and after new move start thinking again
                         moveFinderProcess.terminate()
                         AIThinking = False
                     moveUndone = True
+                    
+                    # When undoing a move, flip the board too if autoFlip is enabled
+                    if autoFlip and not fixedBlackPOV:
+                        boardFlipped = not boardFlipped
 
                 if e.key == p.K_r: # if R key pressed, then reset the board to the very start
                     gs = chessengine.GameState()
@@ -211,6 +245,29 @@ def main():
                         moveFinderProcess.terminate()
                         AIThinking = False
                     moveUndone = True
+                    
+                    # Reset board orientation
+                    if fixedBlackPOV:
+                        boardFlipped = True
+                    else:
+                        boardFlipped = False
+                        
+                if e.key == p.K_f: # if F key pressed, flip the board manually
+                    boardFlipped = not boardFlipped
+                    
+                if e.key == p.K_a: # if A key pressed, toggle auto-flip
+                    autoFlip = not autoFlip
+                
+                if e.key == p.K_UP:
+                    moveLogScroll = max(0, moveLogScroll-1)
+                
+                if e.key == p.K_DOWN:
+                    moveLogScroll = min(maxScroll, moveLogScroll-1)
+        
+        # Set board orientation if playing as black only
+        if not playerOne and playerTwo and not fixedBlackPOV:
+            fixedBlackPOV = True
+            boardFlipped = True
         
         # for computer mvove finding
         if not gameOver and not humanTurn and not moveUndone:
@@ -228,22 +285,28 @@ def main():
                     AIMove = smartmovefinder.findRandomMove(validMoves)
                 gs.makeMove(AIMove)
                 moveMade = True
-
                 playMoveSound(AIMove, gs)
                 animate = True
                 AIThinking = False
+                
+                # Flip board after AI moves if auto-flip is enabled
+                if autoFlip and not fixedBlackPOV:
+                    boardFlipped = not boardFlipped
 
         # reset variables after move is made
         if moveMade:
             if animate:
-                animateMove(gs.moveLog[-1], screen, sqSelected, gs.board, clock)
+                animateMove(gs.moveLog[-1], screen, sqSelected, gs.board, clock, boardFlipped)
             validMoves = gs.getValidMoves()
             moveMade = False
             animate = False
             moveUndone = False
 
         # draw the board representing current game state
-        drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_dragging, dragged_piece, dragged_piece_pos)
+        drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_dragging, dragged_piece, dragged_piece_pos, boardFlipped)
+        
+        # Draw board orientation controls
+        drawBoardControls(screen, autoFlip, boardFlipped)
         
         # print text accordingly if game over
         if gs.checkmate:
@@ -276,12 +339,14 @@ def playMoveSound(move, gs):
 '''
 draw board, highlighted squares if clicked, pieces, move log and notation helpers
 '''
-def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_dragging=False, dragged_piece=None, dragged_piece_pos=()):
+def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_dragging=False, dragged_piece=None, dragged_piece_pos=(), boardFlipped=False):
     drawBoard(screen)
-    highlightSquares(screen, gs, validMoves, sqSelected)
-    drawPieces(screen, gs.board, sqSelected, piece_dragging, dragged_piece, dragged_piece_pos)
+    highlightSquares(screen, gs, validMoves, sqSelected, boardFlipped)
+    drawPieces(screen, gs.board, sqSelected, piece_dragging, dragged_piece, dragged_piece_pos, boardFlipped)
     drawMoveLog(screen, gs, moveLogFont)
-    drawNotationHelper(screen)
+    move_count = len(gs.moveLog)
+    maxScroll = max(0, (move_count//6) - 8)
+    drawNotationHelper(screen, boardFlipped)
 
 '''
 draw 8 x 8 chessboard
@@ -297,29 +362,45 @@ def drawBoard(screen):
 '''
 highlight valid moves when clicked on a piece
 '''
-def highlightSquares(screen, gs, validMoves, sqSelected):
+def highlightSquares(screen, gs, validMoves, sqSelected, boardFlipped=False):
     if sqSelected != ():
         r, c = sqSelected
-        if 0 <= r <8 and 0 <= c < 8:
+        if 0 <= r < 8 and 0 <= c < 8:
             if gs.board[r][c][0] == ('w' if gs.whiteToMove else 'b'):
                 s = p.Surface((SQ_SIZE, SQ_SIZE))
                 s.set_alpha(100)
                 s.fill(p.Color('blue'))
-                screen.blit(s, (NOTATION_WIDTH_VT + c*SQ_SIZE, r*SQ_SIZE))
+                
+                # Convert screen coordinates based on board orientation
+                draw_r, draw_c = r, c
+                if boardFlipped:
+                    draw_r, draw_c = 7 - r, 7 - c
+                
+                screen.blit(s, (NOTATION_WIDTH_VT + draw_c*SQ_SIZE, draw_r*SQ_SIZE))
                 s.fill(p.Color('yellow'))
                 for move in validMoves:
                     if move.startRow == r and move.startCol == c:
-                        screen.blit(s, (NOTATION_WIDTH_VT + move.endCol*SQ_SIZE, move.endRow*SQ_SIZE))
+                        # Convert end position based on board orientation
+                        draw_end_r, draw_end_c = move.endRow, move.endCol
+                        if boardFlipped:
+                            draw_end_r, draw_end_c = 7 - move.endRow, 7 - move.endCol
+                        
+                        screen.blit(s, (NOTATION_WIDTH_VT + draw_end_c*SQ_SIZE, draw_end_r*SQ_SIZE))
 
 '''
 draw pieces on top of board and highlight squares
 '''
-def drawPieces(screen, board, sqSelected, piece_dragging=False, dragged_piece=None, dragged_piece_pos=()):
+def drawPieces(screen, board, sqSelected, piece_dragging=False, dragged_piece=None, dragged_piece_pos=(), boardFlipped=False):
     for r in range(DIMENSION):
         for c in range(DIMENSION):
-            piece = board[r][c]
+            # Convert board coordinates to screen coordinates based on orientation
+            board_r, board_c = r, c
+            if boardFlipped:
+                board_r, board_c = 7 - r, 7 - c
+                
+            piece = board[board_r][board_c]
             if piece != "--":
-                if not (piece_dragging and (r, c) == sqSelected):
+                if not (piece_dragging and (board_r, board_c) == sqSelected):
                     screen.blit(IMAGES[piece], p.Rect(NOTATION_WIDTH_VT + c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
     
     if piece_dragging and dragged_piece and dragged_piece_pos:
@@ -329,13 +410,22 @@ def drawPieces(screen, board, sqSelected, piece_dragging=False, dragged_piece=No
         screen.blit(IMAGES[dragged_piece], p.Rect(x, y, SQ_SIZE, SQ_SIZE))
 
 '''
-draw notation helper (1-8) vertically and (a-h) horizontally
+draw notation helper (1-8) vertically and (a-h) horizontally, adjusted for board orientation
 '''
-def drawNotationHelper(screen):
+def drawNotationHelper(screen, boardFlipped=False):
+    # Clear previous notations
+    notation_area_vertical = p.Rect(0, 0, NOTATION_WIDTH_VT, BOARD_HEIGHT)
+    notation_area_horizontal = p.Rect(0, BOARD_HEIGHT, BOARD_WIDTH + NOTATION_WIDTH_VT, NOTATION_HEIGHT_HZ)
+    p.draw.rect(screen, p.Color('white'), notation_area_vertical)
+    p.draw.rect(screen, p.Color('white'), notation_area_horizontal)
+    
     font = p.font.SysFont("Georgia", 16, False, False)
 
     for c in range(DIMENSION):
-        file_letter = chr(ord('a') + c)
+        # Adjust file letter based on board orientation
+        file_index = c if not boardFlipped else 7 - c
+        file_letter = chr(ord('a') + file_index)
+        
         textObject = font.render(file_letter, True, p.Color('black'))
         x = c * SQ_SIZE + (SQ_SIZE // 2) - (textObject.get_width() // 2) + 20
         y = BOARD_HEIGHT - (NOTATION_HEIGHT_HZ // 2) - (textObject.get_height() // 2)
@@ -343,7 +433,9 @@ def drawNotationHelper(screen):
         screen.blit(textObject, (x, BOARD_HEIGHT))
 
     for r in range(DIMENSION):
-        rank_number = str(DIMENSION - r)
+        # Adjust rank number based on board orientation
+        rank_index = r if not boardFlipped else 7 - r
+        rank_number = str(DIMENSION - rank_index)
 
         textObject = font.render(rank_number, True, p.Color('black'))
 
@@ -358,7 +450,7 @@ def drawNotationHelper(screen):
 '''
 draw move log to see series of moves that lead to current position in game
 '''
-def drawMoveLog(screen, gs, font):
+def drawMoveLog(screen, gs, font, scroll=0):
     moveLogRect = p.Rect(BOARD_WIDTH + NOTATION_WIDTH_VT, 0, MOVE_LOG_PANEL_WIDTH, MOVE_LOG_PANEL_HEIGHT)
     p.draw.rect(screen, p.Color("Black"), moveLogRect)
     moveLog = gs.moveLog
@@ -368,20 +460,31 @@ def drawMoveLog(screen, gs, font):
         if i + 1 < len(moveLog):
             moveString += str(moveLog[i+1])
         moveTexts.append(moveString)
+    
+    # Add scrolling instructions if there are enough moves to scroll
+    if len(moveTexts) > 24:  # Adjust this number based on testing
+        scrollText = font.render("Use UP/DOWN keys to scroll", True, p.Color('gray'))
+        scrollLocation = moveLogRect.move(5, MOVE_LOG_PANEL_HEIGHT - 20)
+        screen.blit(scrollText, scrollLocation)
+    
     movesPerRow = 3
     padding = 5
     textY = padding
     lineSpacing = 2
-    for i in range(0, len(moveTexts), movesPerRow):
+    
+    # Apply scroll offset to decide which moves to display
+    startMove = scroll * movesPerRow
+    visibleMoves = moveTexts[startMove:startMove + 24]  # Show about 24 moves at once
+    
+    for i in range(0, len(visibleMoves), movesPerRow):
         text = ""
         for j in range(movesPerRow):
-            if i + j < len(moveTexts):
-                text +=  moveTexts[i+j]
+            if i + j < len(visibleMoves):
+                text += visibleMoves[i+j]
         textObject = font.render(text, True, p.Color('White'))
         textLocation = moveLogRect.move(padding, textY)
         screen.blit(textObject, textLocation)
         textY += textObject.get_height() + lineSpacing
-
 '''
 draw text in the middle of the board after game is over
 '''
@@ -394,25 +497,70 @@ def drawEndGameText(screen, text):
     screen.blit(textObject, textLocation.move(2, 2))
 
 '''
+draw UI controls for board orientation
+'''
+def drawBoardControls(screen, autoFlip, boardFlipped):
+    font = p.font.SysFont("Georgia", 14, False, False)
+    
+    # Draw at the bottom of the move log panel, but slightly higher to avoid the white line
+    controlsRect = p.Rect(BOARD_WIDTH + NOTATION_WIDTH_VT, BOARD_HEIGHT - 128, MOVE_LOG_PANEL_WIDTH, 128)
+    p.draw.rect(screen, p.Color("dark gray"), controlsRect)
+    
+    # Draw text for auto-flip status
+    autoFlipText = f"Auto-Flip: {'ON' if autoFlip else 'OFF'}"
+    autoFlipObj = font.render(autoFlipText, True, p.Color('white'))
+    screen.blit(autoFlipObj, (controlsRect.x + 10, controlsRect.y + 10))
+    
+    # Draw text for current orientation
+    orientationText = f"Current View: {'Black' if boardFlipped else 'White'}'s POV"
+    orientationObj = font.render(orientationText, True, p.Color('white'))
+    screen.blit(orientationObj, (controlsRect.x + 10, controlsRect.y + 30))
+    
+    # Draw key controls help - now including Z and R
+    keysText = "F: Flip Board  |  A: Toggle Auto-Flip"
+    keysObj = font.render(keysText, True, p.Color('white'))
+    screen.blit(keysObj, (controlsRect.x + 10, controlsRect.y + 50))
+    
+    # Add Z and R key information
+    moreKeysText = "Z: Undo Move  |  R: Reset Board"
+    moreKeysObj = font.render(moreKeysText, True, p.Color('white'))
+    screen.blit(moreKeysObj, (controlsRect.x + 10, controlsRect.y + 70))
+
+'''
 animate pieces going from one square to another
 '''
-def animateMove(move, screen, sqSelected, board, clock):
+def animateMove(move, screen, sqSelected, board, clock, boardFlipped=False):
     global colors
-    coords = []
-    dR = move.endRow - move.startRow
-    dC = move.endCol - move.startCol
+    # Original board coordinates
+    startRow, startCol = move.startRow, move.startCol
+    endRow, endCol = move.endRow, move.endCol
+    
+    # Convert to screen coordinates based on board orientation
+    if boardFlipped:
+        startRow, startCol = 7 - startRow, 7 - startCol
+        endRow, endCol = 7 - endRow, 7 - endCol
+    
+    dR = endRow - startRow
+    dC = endCol - startCol
     framesPerSquare = 5
     frameCount = (abs(dR) + abs(dC)) * framesPerSquare
+    
     for frame in range(frameCount+1):
-        r,c = (move.startRow + dR*frame/frameCount, move.startCol + dC*frame/frameCount)
+        r, c = (startRow + dR*frame/frameCount, startCol + dC*frame/frameCount)
         drawBoard(screen)
-        drawPieces(screen, board, sqSelected)
-        color = colors[(move.endRow + move.endCol) %2]
-        endSquare = p.Rect(NOTATION_WIDTH_VT + move.endCol*SQ_SIZE, move.endRow*SQ_SIZE, SQ_SIZE, SQ_SIZE)
+        drawPieces(screen, board, sqSelected, boardFlipped=boardFlipped)
+        
+        # Get proper color for the destination square
+        board_end_row, board_end_col = move.endRow, move.endCol
+        color = colors[(board_end_row + board_end_col) %2]
+        
+        # Draw end square and captured piece if any
+        endSquare = p.Rect(NOTATION_WIDTH_VT + endCol*SQ_SIZE, endRow*SQ_SIZE, SQ_SIZE, SQ_SIZE)
         p.draw.rect(screen, color, endSquare)
         if move.pieceCaptured != '--':
             screen.blit(IMAGES[move.pieceCaptured], endSquare)
 
+        # Draw moving piece
         screen.blit(IMAGES[move.pieceMoved], p.Rect(NOTATION_WIDTH_VT + c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
         p.display.flip()
         clock.tick(60)
@@ -420,18 +568,20 @@ def animateMove(move, screen, sqSelected, board, clock):
 '''
 UI aided selection of piece to promote to, once pawn reaches back rank
 '''
-def drawPromotionSelection(screen, row, col, is_white):
+def drawPromotionSelection(screen, row, col, is_white, boardFlipped=False):
     if is_white:
         pieces = ['wQ', 'wR', 'wB', 'wN']
     else:
         pieces = ['bQ', 'bR', 'bB', 'bN']
 
-    selection_rect = p.Rect(col*SQ_SIZE, row*SQ_SIZE, SQ_SIZE, 4*SQ_SIZE)
+    # Calculate the rectangle position
+    selection_rect = p.Rect(NOTATION_WIDTH_VT + col*SQ_SIZE, row*SQ_SIZE, SQ_SIZE, 4*SQ_SIZE)
     p.draw.rect(screen, p.Color('gray'), selection_rect)
     p.draw.rect(screen, p.Color('black'), selection_rect, 2)
 
+    # Draw pieces for selection
     for i, piece in enumerate(pieces):
-        piece_rect = p.Rect(col*SQ_SIZE, (row+i)*SQ_SIZE, SQ_SIZE, SQ_SIZE)
+        piece_rect = p.Rect(NOTATION_WIDTH_VT + col*SQ_SIZE, (row+i)*SQ_SIZE, SQ_SIZE, SQ_SIZE)
         screen.blit(IMAGES[piece], piece_rect)
 
     p.display.flip()
@@ -446,13 +596,15 @@ def drawPromotionSelection(screen, row, col, is_white):
                 click_col = (location[0] - NOTATION_WIDTH_VT) // SQ_SIZE
                 click_row = location[1] // SQ_SIZE
                 
+                # Verify click is within the selection rectangle
                 if click_col == col and row <= click_row < row + 4:
                     selection_index = click_row - row
                     piece_type = pieces[selection_index][1]
                     p.mixer.Sound.play(SOUNDS["promote"])
                     return piece_type
+    
+    return 'Q'  # Default to Queen if selection fails
 
 
 if __name__ == "__main__":
     main()
-
