@@ -3,6 +3,9 @@ import chessengine
 import smartmovefinder
 from multiprocessing import Process, Queue
 
+'''
+Variables defined globally to be used in functions
+'''
 
 BOARD_WIDTH = BOARD_HEIGHT = 512
 MOVE_LOG_PANEL_WIDTH = 250
@@ -14,11 +17,19 @@ MAX_FPS = 15
 IMAGES = {}
 SOUNDS = {}
 
+'''
+Load Images of pieces from directory using pygame
+'''
+
 def loadImages():
     pieces = ['wp', 'wR', 'wN', 'wB', 'wK', 'wQ', 'bp', 'bR', 'bN', 'bB', 'bK', 'bQ']
     for piece in pieces:
         IMAGES[piece] = p.transform.scale(p.image.load(f'images/{piece}.png'), (SQ_SIZE, SQ_SIZE))
 
+
+'''
+Load sounds for different piece movements 
+'''
 
 def loadSounds():
     types = ["capture", "castle", "move-check", "move-self", "promote", "notify"]
@@ -26,95 +37,111 @@ def loadSounds():
         SOUNDS[type] = p.mixer.Sound("sounds/" + type + ".mp3")
 
 
+'''
+Main function which runs the chessboard
+'''
 def main():
-    p.init()
-    screen = p.display.set_mode((BOARD_WIDTH + MOVE_LOG_PANEL_WIDTH + NOTATION_WIDTH_VT, BOARD_HEIGHT + NOTATION_HEIGHT_HZ))
-    clock = p.time.Clock()
-    screen.fill(p.Color('white'))
-    gs = chessengine.GameState()
-    validMoves = gs.getValidMoves()
-    moveMade = False
-    animate = False
+    p.init() # initialize pygame
+    screen = p.display.set_mode((BOARD_WIDTH + MOVE_LOG_PANEL_WIDTH + NOTATION_WIDTH_VT, BOARD_HEIGHT + NOTATION_HEIGHT_HZ)) # set screen dimensions and display
+    clock = p.time.Clock() # set clock to define fps later
+    screen.fill(p.Color('white')) # start with white screen
+    gs = chessengine.GameState() # initialize the GameState variable to access current state of game
+    validMoves = gs.getValidMoves() # generate the set of valid moves possible
+    moveMade = False # no move is made yet
+    animate = False # no animations have to be done yet
 
-    moveLogFont = p.font.SysFont("Arial", 14, False, False)
+    moveLogFont = p.font.SysFont("Arial", 14, False, False) # set font for printing move logs
     
-    loadImages()
+    # load images and sound only once
+    loadImages() 
     loadSounds()
-    running = True
-    sqSelected = ()
-    playerClicks = []
+
+    # set necessary variables for later use
+
+    running = True # loop for running game
+    sqSelected = () # coordinates of square selected by player
+    playerClicks = [] # log of clicks made by player
     gameOver = False
-    playerOne = True
-    playerTwo = False
+    playerOne = True # For white player, if true -> no computer
+    playerTwo = False # For black player, if false -> computer plays
     AIThinking = False
     moveFinderProcess = None
     moveUndone = False
 
+    # necessary variables for dragging and dropping pieces
     piece_dragging = False
     dragged_piece = None
     dragged_piece_pos = ()
     dragged_piece_initial_pos = ()
 
+    # running the game
     while running:
-        humanTurn = (gs.whiteToMove and playerOne) or (not gs.whiteToMove and playerTwo)
+        humanTurn = (gs.whiteToMove and playerOne) or (not gs.whiteToMove and playerTwo) # if human is playing
         for e in p.event.get():
             
-            if e.type == p.QUIT:
+            # stop the game if closed window
+            if e.type == p.QUIT: 
                 running = False
 
+            # detect mouse clicks and movements
             elif e.type == p.MOUSEBUTTONDOWN:
-                    if not gameOver and humanTurn and e.button == 1:
+                    if not gameOver and humanTurn and e.button == 1: # LMB clicks and drags
 
-                        location = p.mouse.get_pos()
-                        col = (location[0] - NOTATION_WIDTH_VT) //SQ_SIZE
-                        row = location[1]//SQ_SIZE
+                        location = p.mouse.get_pos() # get current location of mouse cursor click
+                        col = (location[0] - NOTATION_WIDTH_VT) //SQ_SIZE # detect column
+                        row = location[1]//SQ_SIZE # detect row
                         
-                        if 0 <= col < 8 and 0 <= row < 8:
+                        if 0 <= col < 8 and 0 <= row < 8: # if bounds satisfied detect square
                             piece = gs.board[row][col]
 
-                            if sqSelected == (row, col) or col >= 8:
+                            if sqSelected == (row, col) or col >= 8: # double click on same square = unclick
                                 sqSelected = ()
                                 playerClicks = []
-                            else:
+                            else: # if first click, log it
                                 sqSelected = (row, col)
                                 playerClicks.append(sqSelected)
-
+                            
+                            # if piece exists and move order is correct, drag piece
                             if piece != '--' and ((piece[0] == 'w' and gs.whiteToMove) or (piece[0] == 'b' and not gs.whiteToMove)):
                                 piece_dragging = True
                                 dragged_piece = piece
                                 dragged_piece_pos = location
                                 dragged_piece_initial_pos = (row, col)
 
-
+                        # if two squares clicked one after the other
                         if len(playerClicks) == 2:
-                            move = chessengine.Move(playerClicks[0], playerClicks[1], gs.board)
+                            move = chessengine.Move(playerClicks[0], playerClicks[1], gs.board) # detect the move
+                            # parse through all valid moves
                             for i in range(len(validMoves)):
-                                if move == validMoves[i]:
-                                    gs.makeMove(validMoves[i])
+                                if move == validMoves[i]: # if move is valid
+                                    gs.makeMove(validMoves[i]) # make the move
                                     moveMade = True
-                                    playMoveSound(move, gs)
-                                    animate = True
-                                    sqSelected = ()
+                                    playMoveSound(move, gs) # play sound accordingly
+                                    animate = True # for animations
+                                    sqSelected = () 
                                     playerClicks = []
                                     piece_dragging = False
                                     break
 
-                            if not moveMade:
+                            if not moveMade: # if no move made, retain the first square selected
                                 playerClicks = [sqSelected]
-                
+
+            # when stopped clicking    
             elif e.type == p.MOUSEBUTTONUP:
-                if piece_dragging and e.button == 1:
+                if piece_dragging and e.button == 1: # if was LMB
                     location = p.mouse.get_pos()
                     col = (location[0] - NOTATION_WIDTH_VT) //SQ_SIZE
                     row = location[1]//SQ_SIZE
 
+                    # if within bounds, drag the piece
                     if 0 <= col < 8 and 0 <= row < 8:
-                        if (row, col) != dragged_piece_initial_pos:
+                        if (row, col) != dragged_piece_initial_pos: # if not dropped into starting square
                             start_row, start_col = dragged_piece_initial_pos
                             
                             isPawnPromotion = False
                             promotionChoice = 'Q' 
                             
+                            # detect pawn promotion
                             if gs.board[start_row][start_col][1] == 'p':
                                 
                                 if (gs.board[start_row][start_col][0] == 'w' and row == 0) or \
@@ -124,13 +151,16 @@ def main():
                                     is_white = gs.board[start_row][start_col][0] == 'w'
                                     promotionChoice = drawPromotionSelection(screen, 2 if is_white else 1, col, is_white)
                             
-                           
+                           # set the move after dropping
                             move = chessengine.Move(dragged_piece_initial_pos, (row, col), gs.board, 
                                                 isPawnPromotion=isPawnPromotion, 
                                                 promotionChoice=promotionChoice)
                             
+                            # parse through valid moves
                             for i in range(len(validMoves)):
                                 valid_move = validMoves[i]
+
+                                # if move is valid
                                 if move.startRow == valid_move.startRow and move.startCol == valid_move.startCol and \
                                 move.endRow == valid_move.endRow and move.endCol == valid_move.endCol:
                                     
@@ -145,6 +175,7 @@ def main():
                                     playerClicks = []
                                     break
                     
+                    # reset all dragging variables after dropping it
                     piece_dragging = False
                     dragged_piece = None
                     dragged_piece_pos = ()
@@ -152,24 +183,26 @@ def main():
 
                     if not moveMade and sqSelected != ():
                         playerClicks = [sqSelected]
-                
+            
+            # detects mouse drag
             elif e.type == p.MOUSEMOTION:
                 if piece_dragging:
                     dragged_piece_pos = p.mouse.get_pos()
             
+            # detect keyboard inputs
             elif e.type == p.KEYDOWN:
-                if e.key == p.K_z:
-                    gs.undoMove()
+                if e.key == p.K_z: # if Z key pressed
+                    gs.undoMove() # undo last move
                     moveMade = True
                     playMoveSound(move, gs)
                     animate = False
                     gameOver = False
-                    if AIThinking:
+                    if AIThinking: # if computer was calculating, terminate the process and after new move start thinking again
                         moveFinderProcess.terminate()
                         AIThinking = False
                     moveUndone = True
 
-                if e.key == p.K_r:
+                if e.key == p.K_r: # if R key pressed, then reset the board to the very start
                     gs = chessengine.GameState()
                     validMoves = gs.getValidMoves()
                     sqSelected = ()
@@ -181,7 +214,8 @@ def main():
                         moveFinderProcess.terminate()
                         AIThinking = False
                     moveUndone = True
-
+        
+        # for computer mvove finding
         if not gameOver and not humanTurn and not moveUndone:
             if not AIThinking:
                 AIThinking = True
@@ -192,9 +226,8 @@ def main():
 
             if not moveFinderProcess.is_alive():
                 print("Done thinking")
-                AIMove = returnQueue.get()
-            #AIMove = smartmovefinder.findBestMove(gs, validMoves)
-                if AIMove is None:
+                AIMove = returnQueue.get() # get the best move
+                if AIMove is None: # if all moves lead to same score, then choose randomly
                     AIMove = smartmovefinder.findRandomMove(validMoves)
                 gs.makeMove(AIMove)
                 moveMade = True
@@ -203,7 +236,7 @@ def main():
                 animate = True
                 AIThinking = False
 
-
+        # reset variables after move is made
         if moveMade:
             if animate:
                 animateMove(gs.moveLog[-1], screen, sqSelected, gs.board, clock)
@@ -212,9 +245,10 @@ def main():
             animate = False
             moveUndone = False
 
-            
+        # draw the board representing current game state
         drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_dragging, dragged_piece, dragged_piece_pos)
         
+        # print text accordingly if game over
         if gs.checkmate:
             gameOver = True
             if gs.whiteToMove:
@@ -225,10 +259,11 @@ def main():
             gameOver = True
             drawEndGameText(screen, 'Stalemate')
 
-        clock.tick(MAX_FPS)
+        clock.tick(MAX_FPS) # set FPS
         p.display.flip()
 
 
+# play sounds according to type of each move
 def playMoveSound(move, gs):
     if gs.inCheck():
         p.mixer.Sound.play(SOUNDS["move-check"])
@@ -239,7 +274,7 @@ def playMoveSound(move, gs):
     else:
         p.mixer.Sound.play(SOUNDS["move-self"])
 
-
+# draw board, highlighted squares if clicked, pieces, move log and notation helpers
 def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_dragging=False, dragged_piece=None, dragged_piece_pos=()):
     drawBoard(screen)
     highlightSquares(screen, gs, validMoves, sqSelected)
@@ -248,7 +283,7 @@ def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_draggin
     drawNotationHelper(screen)
 
 
-
+# draw 8 x 8 chessboard
 def drawBoard(screen):
     global colors
     colors = [p.Color(241, 207, 167), p.Color(186, 99, 52)]
@@ -258,7 +293,7 @@ def drawBoard(screen):
             p.draw.rect(screen, color, p.Rect(NOTATION_WIDTH_VT + c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 
-
+# highlight valid moves when clicked on a piece
 def highlightSquares(screen, gs, validMoves, sqSelected):
     if sqSelected != ():
         r, c = sqSelected
@@ -274,7 +309,7 @@ def highlightSquares(screen, gs, validMoves, sqSelected):
                         screen.blit(s, (NOTATION_WIDTH_VT + move.endCol*SQ_SIZE, move.endRow*SQ_SIZE))
 
 
-
+# draw pieces on top of board and highlight squares
 def drawPieces(screen, board, sqSelected, piece_dragging=False, dragged_piece=None, dragged_piece_pos=()):
     for r in range(DIMENSION):
         for c in range(DIMENSION):
@@ -290,7 +325,7 @@ def drawPieces(screen, board, sqSelected, piece_dragging=False, dragged_piece=No
         screen.blit(IMAGES[dragged_piece], p.Rect(x, y, SQ_SIZE, SQ_SIZE))
 
 
-
+# draw notation helper (1-8) vertically and (a-h) horizontally
 def drawNotationHelper(screen):
     font = p.font.SysFont("Georgia", 16, False, False)
 
@@ -316,7 +351,7 @@ def drawNotationHelper(screen):
     p.draw.rect(screen, p.Color('white'), notation_corner)
 
 
-
+# draw move log to see series of moves that lead to current position in game
 def drawMoveLog(screen, gs, font):
     moveLogRect = p.Rect(BOARD_WIDTH + NOTATION_WIDTH_VT, 0, MOVE_LOG_PANEL_WIDTH, MOVE_LOG_PANEL_HEIGHT)
     p.draw.rect(screen, p.Color("Black"), moveLogRect)
@@ -342,7 +377,7 @@ def drawMoveLog(screen, gs, font):
         textY += textObject.get_height() + lineSpacing
 
 
-
+# draw text in the middle of the board after game is over
 def drawEndGameText(screen, text):
     font = p.font.SysFont("Helvetica", 32, True, False)
     textObject = font.render(text, 0, p.Color('Gray'))
@@ -352,7 +387,7 @@ def drawEndGameText(screen, text):
     screen.blit(textObject, textLocation.move(2, 2))
 
 
-
+# animate pieces going from one square to another
 def animateMove(move, screen, sqSelected, board, clock):
     global colors
     coords = []
@@ -374,7 +409,7 @@ def animateMove(move, screen, sqSelected, board, clock):
         p.display.flip()
         clock.tick(60)
 
-
+# UI aided selection of piece to promote to, once pawn reaches back rank
 def drawPromotionSelection(screen, row, col, is_white):
     if is_white:
         pieces = ['wQ', 'wR', 'wB', 'wN']
@@ -406,6 +441,7 @@ def drawPromotionSelection(screen, row, col, is_white):
                     piece_type = pieces[selection_index][1]
                     p.mixer.Sound.play(SOUNDS["promote"])
                     return piece_type
+
 
 if __name__ == "__main__":
     main()
