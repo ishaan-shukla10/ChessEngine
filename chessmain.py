@@ -7,6 +7,10 @@ from multiprocessing import Process, Queue
 BOARD_WIDTH = BOARD_HEIGHT = 512
 MOVE_LOG_PANEL_WIDTH = 250
 MOVE_LOG_PANEL_HEIGHT = BOARD_HEIGHT
+NOTATION_WIDTH_HZ = BOARD_WIDTH
+NOTATION_HEIGHT_HZ = 40
+NOTATION_HEIGHT_VT = BOARD_HEIGHT
+NOTATION_WIDTH_VT = 40
 DIMENSION = 8
 SQ_SIZE = BOARD_HEIGHT // 8
 MAX_FPS = 15
@@ -244,6 +248,7 @@ def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_draggin
     highlightSquares(screen, gs, validMoves, sqSelected)
     drawPieces(screen, gs.board, sqSelected, piece_dragging, dragged_piece, dragged_piece_pos)
     drawMoveLog(screen, gs, moveLogFont)
+    drawNotationHelper(screen, gs)
 
 
 
@@ -286,6 +291,18 @@ def drawPieces(screen, board, sqSelected, piece_dragging=False, dragged_piece=No
         x = dragged_piece_pos[0] - SQ_SIZE//2
         y = dragged_piece_pos[1] - SQ_SIZE//2
         screen.blit(IMAGES[dragged_piece], p.Rect(x, y, SQ_SIZE, SQ_SIZE))
+
+
+
+def drawNotationHelper(screen, gs):
+    font = p.font.SysFont("Arial", 14, False, False)
+    notation_helper_rect_hz = p.Rect(0, BOARD_HEIGHT, NOTATION_WIDTH_HZ, NOTATION_HEIGHT_HZ)
+    p.draw.rect(screen, p.Color('white'), notation_helper_rect_hz)
+    number_helpers = [i for i in range(1, 9)]
+    for number in number_helpers:
+        textObject = font.render(number, True, p.Color('black'))
+        textLocation = notation_helper_rect_hz.move(DIMENSION//SQ_SIZE, 0)
+        screen.blit(textObject, textLocation)
 
 
 
