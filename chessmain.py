@@ -7,10 +7,7 @@ from multiprocessing import Process, Queue
 BOARD_WIDTH = BOARD_HEIGHT = 512
 MOVE_LOG_PANEL_WIDTH = 250
 MOVE_LOG_PANEL_HEIGHT = BOARD_HEIGHT
-NOTATION_WIDTH_HZ = BOARD_WIDTH
-NOTATION_HEIGHT_HZ = 40
-NOTATION_HEIGHT_VT = BOARD_HEIGHT
-NOTATION_WIDTH_VT = 40
+NOTATION_HEIGHT_HZ = NOTATION_WIDTH_VT = 20
 DIMENSION = 8
 SQ_SIZE = BOARD_HEIGHT // 8
 MAX_FPS = 15
@@ -31,7 +28,7 @@ def loadSounds():
 
 def main():
     p.init()
-    screen = p.display.set_mode((BOARD_WIDTH + MOVE_LOG_PANEL_WIDTH, BOARD_HEIGHT))
+    screen = p.display.set_mode((BOARD_WIDTH + MOVE_LOG_PANEL_WIDTH + NOTATION_WIDTH_VT, BOARD_HEIGHT + NOTATION_HEIGHT_HZ))
     clock = p.time.Clock()
     screen.fill(p.Color('white'))
     gs = chessengine.GameState()
@@ -69,7 +66,7 @@ def main():
                     if not gameOver and humanTurn and e.button == 1:
 
                         location = p.mouse.get_pos()
-                        col = location[0]//SQ_SIZE
+                        col = (location[0] - NOTATION_WIDTH_VT) //SQ_SIZE
                         row = location[1]//SQ_SIZE
                         
                         if 0 <= col < 8 and 0 <= row < 8:
@@ -108,7 +105,7 @@ def main():
             elif e.type == p.MOUSEBUTTONUP:
                 if piece_dragging and e.button == 1:
                     location = p.mouse.get_pos()
-                    col = location[0]//SQ_SIZE
+                    col = (location[0] - NOTATION_WIDTH_VT) //SQ_SIZE
                     row = location[1]//SQ_SIZE
 
                     if 0 <= col < 8 and 0 <= row < 8:
@@ -248,7 +245,7 @@ def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_draggin
     highlightSquares(screen, gs, validMoves, sqSelected)
     drawPieces(screen, gs.board, sqSelected, piece_dragging, dragged_piece, dragged_piece_pos)
     drawMoveLog(screen, gs, moveLogFont)
-    drawNotationHelper(screen, gs)
+    drawNotationHelper(screen)
 
 
 
@@ -258,7 +255,7 @@ def drawBoard(screen):
     for r in range(DIMENSION):
         for c in range(DIMENSION):
             color = colors[((r+c)%2)]
-            p.draw.rect(screen, color, p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+            p.draw.rect(screen, color, p.Rect(NOTATION_WIDTH_VT + c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 
 
@@ -270,11 +267,11 @@ def highlightSquares(screen, gs, validMoves, sqSelected):
                 s = p.Surface((SQ_SIZE, SQ_SIZE))
                 s.set_alpha(100)
                 s.fill(p.Color('blue'))
-                screen.blit(s, (c*SQ_SIZE, r*SQ_SIZE))
+                screen.blit(s, (NOTATION_WIDTH_VT + c*SQ_SIZE, r*SQ_SIZE))
                 s.fill(p.Color('yellow'))
                 for move in validMoves:
                     if move.startRow == r and move.startCol == c:
-                        screen.blit(s, (move.endCol*SQ_SIZE, move.endRow*SQ_SIZE))
+                        screen.blit(s, (NOTATION_WIDTH_VT + move.endCol*SQ_SIZE, move.endRow*SQ_SIZE))
 
 
 
@@ -284,30 +281,44 @@ def drawPieces(screen, board, sqSelected, piece_dragging=False, dragged_piece=No
             piece = board[r][c]
             if piece != "--":
                 if not (piece_dragging and (r, c) == sqSelected):
-                    screen.blit(IMAGES[piece], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+                    screen.blit(IMAGES[piece], p.Rect(NOTATION_WIDTH_VT + c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
     
     if piece_dragging and dragged_piece and dragged_piece_pos:
         # Center the piece on the cursor
-        x = dragged_piece_pos[0] - SQ_SIZE//2
-        y = dragged_piece_pos[1] - SQ_SIZE//2
+        x = min(max(dragged_piece_pos[0] - SQ_SIZE//2, NOTATION_WIDTH_VT), BOARD_WIDTH + NOTATION_WIDTH_VT - SQ_SIZE)
+        y = min(max(dragged_piece_pos[1] - SQ_SIZE//2, 0), BOARD_HEIGHT - SQ_SIZE)
         screen.blit(IMAGES[dragged_piece], p.Rect(x, y, SQ_SIZE, SQ_SIZE))
 
 
 
-def drawNotationHelper(screen, gs):
-    font = p.font.SysFont("Arial", 14, False, False)
-    notation_helper_rect_hz = p.Rect(0, BOARD_HEIGHT, NOTATION_WIDTH_HZ, NOTATION_HEIGHT_HZ)
-    p.draw.rect(screen, p.Color('white'), notation_helper_rect_hz)
-    number_helpers = [i for i in range(1, 9)]
-    for number in number_helpers:
-        textObject = font.render(number, True, p.Color('black'))
-        textLocation = notation_helper_rect_hz.move(DIMENSION//SQ_SIZE, 0)
-        screen.blit(textObject, textLocation)
+def drawNotationHelper(screen):
+    font = p.font.SysFont("Georgia", 16, False, False)
+
+    for c in range(DIMENSION):
+        file_letter = chr(ord('a') + c)
+        textObject = font.render(file_letter, True, p.Color('black'))
+        x = c * SQ_SIZE + (SQ_SIZE // 2) - (textObject.get_width() // 2) + 20
+        y = BOARD_HEIGHT - (NOTATION_HEIGHT_HZ // 2) - (textObject.get_height() // 2)
+
+        screen.blit(textObject, (x, BOARD_HEIGHT))
+
+    for r in range(DIMENSION):
+        rank_number = str(DIMENSION - r)
+
+        textObject = font.render(rank_number, True, p.Color('black'))
+
+        x = (NOTATION_WIDTH_VT // 2) - (textObject.get_width() // 2) + 20
+        y = r * SQ_SIZE + (SQ_SIZE // 2) - (textObject.get_height() // 2) 
+
+        screen.blit(textObject, (5, y))
+    
+    notation_corner = p.Rect(0, BOARD_HEIGHT, NOTATION_WIDTH_VT, NOTATION_HEIGHT_HZ)
+    p.draw.rect(screen, p.Color('white'), notation_corner)
 
 
 
 def drawMoveLog(screen, gs, font):
-    moveLogRect = p.Rect(BOARD_WIDTH, 0, MOVE_LOG_PANEL_WIDTH, MOVE_LOG_PANEL_HEIGHT)
+    moveLogRect = p.Rect(BOARD_WIDTH + NOTATION_WIDTH_VT, 0, MOVE_LOG_PANEL_WIDTH, MOVE_LOG_PANEL_HEIGHT)
     p.draw.rect(screen, p.Color("Black"), moveLogRect)
     moveLog = gs.moveLog
     moveTexts = []
@@ -354,12 +365,12 @@ def animateMove(move, screen, sqSelected, board, clock):
         drawBoard(screen)
         drawPieces(screen, board, sqSelected)
         color = colors[(move.endRow + move.endCol) %2]
-        endSquare = p.Rect(move.endCol*SQ_SIZE, move.endRow*SQ_SIZE, SQ_SIZE, SQ_SIZE)
+        endSquare = p.Rect(NOTATION_WIDTH_VT + move.endCol*SQ_SIZE, move.endRow*SQ_SIZE, SQ_SIZE, SQ_SIZE)
         p.draw.rect(screen, color, endSquare)
         if move.pieceCaptured != '--':
             screen.blit(IMAGES[move.pieceCaptured], endSquare)
 
-        screen.blit(IMAGES[move.pieceMoved], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+        screen.blit(IMAGES[move.pieceMoved], p.Rect(NOTATION_WIDTH_VT + c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
         p.display.flip()
         clock.tick(60)
 
@@ -387,7 +398,7 @@ def drawPromotionSelection(screen, row, col, is_white):
                 return 'Q' 
             elif e.type == p.MOUSEBUTTONDOWN:
                 location = p.mouse.get_pos()
-                click_col = location[0] // SQ_SIZE
+                click_col = (location[0] - NOTATION_WIDTH_VT) // SQ_SIZE
                 click_row = location[1] // SQ_SIZE
                 
                 if click_col == col and row <= click_row < row + 4:
