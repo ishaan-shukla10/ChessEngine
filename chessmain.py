@@ -2,6 +2,7 @@ import pygame as p
 import chessengine
 import smartmovefinder
 from multiprocessing import Process, Queue
+import math
 
 '''
 Variables defined globally to be used in functions
@@ -60,7 +61,7 @@ def main():
     playerClicks = [] # log of clicks made by player
     gameOver = False
     playerOne = True # For white player, if true -> no computer
-    playerTwo = True # For black player, if true -> human plays (changed to True by default)
+    playerTwo = False # For black player, if true -> human plays
     AIThinking = False
     moveFinderProcess = None
     moveUndone = False
@@ -69,6 +70,11 @@ def main():
     boardFlipped = False # Track if board is currently flipped (False = white's POV, True = black's POV)
     autoFlip = True # If True, board will flip automatically after each move
     fixedBlackPOV = not playerOne and playerTwo # If True, board will stay in black's POV
+
+
+    startDrawingArrow = False
+    startCoordArrows = ()
+    endCoordArrows = ()
 
     # necessary variables for dragging and dropping pieces
     piece_dragging = False
@@ -137,6 +143,20 @@ def main():
 
                             if not moveMade: # if no move made, retain the first square selected
                                 playerClicks = [sqSelected]
+                        
+                    if e.button == 3:
+                        startDrawingArrow = True
+                        location = p.mouse.get_pos()
+                        col = (location[0] - NOTATION_WIDTH_VT) // SQ_SIZE
+                        row = location[1] // SQ_SIZE
+
+                        if boardFlipped:
+                            col = 7 - col
+                            row = 7 - row
+
+                        if 0 <= row < 8 and 0 <= col < 8:
+                            startCoordArrows = (row, col)
+
 
             # when stopped clicking    
             elif e.type == p.MOUSEBUTTONUP:
@@ -210,9 +230,23 @@ def main():
                     if not moveMade and sqSelected != ():
                         playerClicks = [sqSelected]
             
+                if e.button == 3 and startDrawingArrow:
+                    location = p.mouse.get_pos()
+                    col = (location[0] - NOTATION_WIDTH_VT) // SQ_SIZE
+                    row = location[1] // SQ_SIZE
+
+                    if boardFlipped:
+                        col = 7 - col
+                        row = 7 - row
+
+                    if 0 <= row < 8 and 0 <= col < 8:
+                        endCoordArrows = (row, col)
+                        startDrawingArrow = False
+                    
+            
             # detects mouse drag
             elif e.type == p.MOUSEMOTION:
-                if piece_dragging:
+                if piece_dragging and e.button == 1:
                     dragged_piece_pos = p.mouse.get_pos()
             
             # detect keyboard inputs
@@ -296,7 +330,7 @@ def main():
             moveUndone = False
 
         # draw the board representing current game state
-        drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_dragging, dragged_piece, dragged_piece_pos, boardFlipped)
+        drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, startCoordArrows, endCoordArrows, piece_dragging, dragged_piece, dragged_piece_pos, boardFlipped)
         
         # Draw board orientation controls
         drawBoardControls(screen, autoFlip, boardFlipped)
@@ -316,6 +350,53 @@ def main():
         p.display.flip()
 
 
+
+def drawArrow(screen, start, end, boardFlipped=False):
+    if start == end:
+        return 
+
+    startRow, startCol = start
+    endRow, endCol = end
+    
+    if boardFlipped:
+        startRow, startCol = 7 - startRow, 7 - startCol
+        endRow, endCol = 7 - endRow, 7 - endCol
+    
+    # Calculate center points of squares
+    startX = NOTATION_WIDTH_VT + startCol * SQ_SIZE + SQ_SIZE // 2
+    startY = startRow * SQ_SIZE + SQ_SIZE // 2
+    endX = NOTATION_WIDTH_VT + endCol * SQ_SIZE + SQ_SIZE // 2
+    endY = endRow * SQ_SIZE + SQ_SIZE // 2
+    
+    # Calculate angle and distance
+    dx = endX - startX
+    dy = endY - startY
+    angle = math.atan2(dy, dx)
+    
+    # Arrow styling
+    arrowhead_size = 30
+    line_width = 8
+    arrow_color = p.Color(89, 164, 93)
+    
+    # Adjust the coefficient to reduce the gap - try 0.8 instead of 1.0
+    # This means the line will extend further into the arrowhead base
+    adjustment_factor = 0.8
+    line_end_x = endX - adjustment_factor * arrowhead_size * math.cos(angle)
+    line_end_y = endY - adjustment_factor * arrowhead_size * math.sin(angle)
+    
+    # Draw arrow line
+    p.draw.line(screen, arrow_color, (startX, startY), (line_end_x, line_end_y), line_width)
+    
+    # Draw arrowhead
+    p.draw.polygon(screen, arrow_color, [
+        (endX, endY),
+        (endX - arrowhead_size * math.cos(angle - math.pi/6), 
+         endY - arrowhead_size * math.sin(angle - math.pi/6)),
+        (endX - arrowhead_size * math.cos(angle + math.pi/6), 
+         endY - arrowhead_size * math.sin(angle + math.pi/6))
+    ])
+        
+
 '''
 play sounds according to type of each move
 ''' 
@@ -332,9 +413,11 @@ def playMoveSound(move, gs):
 '''
 draw board, highlighted squares if clicked, pieces, move log and notation helpers
 '''
-def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_dragging=False, dragged_piece=None, dragged_piece_pos=(), boardFlipped=False):
+def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, startCoordArrows, endCoordArrows, piece_dragging=False, dragged_piece=None, dragged_piece_pos=(), boardFlipped=False):
     drawBoard(screen)
     highlightSquares(screen, gs, validMoves, sqSelected, boardFlipped)
+    if startCoordArrows != () and endCoordArrows != ():
+        drawArrow(screen, startCoordArrows, endCoordArrows, boardFlipped)
     drawPieces(screen, gs.board, sqSelected, piece_dragging, dragged_piece, dragged_piece_pos, boardFlipped)
     drawMoveLog(screen, gs, moveLogFont)
     drawNotationHelper(screen, boardFlipped)
