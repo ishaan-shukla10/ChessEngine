@@ -378,8 +378,7 @@ def drawArrow(screen, start, end, boardFlipped=False):
     line_width = 8
     arrow_color = p.Color(89, 164, 93)
     
-    # Adjust the coefficient to reduce the gap - try 0.8 instead of 1.0
-    # This means the line will extend further into the arrowhead base
+    # Adjustment coefficient for gap between arrow line and head
     adjustment_factor = 0.8
     line_end_x = endX - adjustment_factor * arrowhead_size * math.cos(angle)
     line_end_y = endY - adjustment_factor * arrowhead_size * math.sin(angle)
