@@ -63,7 +63,7 @@ piecePositionScores = {'N': knightScores, 'Q': queenScores, 'R': rookScores, 'B'
 
 CHECKMATE = 1000
 STALEMATE = 0
-DEPTH = 3
+DEPTH = 2
 
 
 
@@ -113,7 +113,7 @@ def findBestMove(gs, validMoves, returnQueue):
     global nextMove
     nextMove = None
     
-    if USE_OPENING_BOOK and len(gs.moveLog) < MAX_BOOK_MOVE:
+    if USE_OPENING_BOOK and len(gs.moveLog) < 2 * MAX_BOOK_MOVE:
         book_move = opening_book.get_book_move(gs.board, gs.whiteToMove, gs.currentCastlingRights, 
                                             gs.enPassantPossible[1] if gs.enPassantPossible else -1, selection_mode = "mixed")
         if book_move:

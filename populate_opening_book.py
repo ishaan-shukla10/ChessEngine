@@ -142,7 +142,7 @@ class PgnParser:
                     return valid_move
         
         
-        if len(move_text) == 3 and move_text[0] in 'NBRQK' and move_text[1] in 'abcdefgh' and str(move_text[2]) in '12345678':
+        if len(move_text) == 3 and move_text[0] in 'NBRQK' and move_text[1] in 'abcdefgh' and move_text[2] in '12345678':
             piece_type, file_char, rank_char = move_text[0], move_text[1], move_text[2]
             end_col = ord(file_char) - ord('a')
             end_row = 8 - int(rank_char)
@@ -171,15 +171,22 @@ class PgnParser:
             return None
         
 
-        if len(move_text) == 5 and move_text[0] in 'NBRQK' and move_text[1] in 'abcdefgh' and move_text[2] == 'x' and move_text[3] in 'abcdefgh' and move_text[4] in '12345678':
+        if len(move_text) == 5 and move_text[0] in 'NBRQK' and move_text[1] in 'abcdefgh12345678' and move_text[2] == 'x' and move_text[3] in 'abcdefgh' and move_text[4] in '12345678':
             piece_type = move_text[0]
             file_char, rank_char = move_text[3], move_text[4]
+            disambig = move_text[1]
             end_col = ord(file_char) - ord('a')
             end_row = 8 - int(rank_char)
-
+            
             for valid_move in valid_moves:
                 if valid_move.pieceMoved[1] == piece_type and valid_move.endRow == end_row and valid_move.endCol == end_col and valid_move.isCapture:
-                    return valid_move
+                    # File disambiguation
+                    if disambig in 'abcdefgh' and valid_move.startCol == ord(disambig) - ord('a'):
+                        return valid_move
+                    # Rank disambiguation
+                    elif disambig in '12345678' and valid_move.startRow == 8 - int(disambig):
+                        return valid_move
+            return None
 
 
         
@@ -209,6 +216,113 @@ class PgnParser:
             return self.find_matching_move(move_text[:-1], valid_moves)
         
         return None
+    
+
+def import_pgn_game_mid_section(parser, game_moves, opening_book, game_number, start_move=11, max_moves=10, quality=1):
+    """
+    Import moves starting from a specific move number up to max_moves beyond that.
+    
+    Args:
+        parser: PGN parser object
+        game_moves: List of moves in the game
+        opening_book: Opening book to add positions to
+        game_number: Game number for logging purposes
+        start_move: Move number to start importing from (default: 11)
+        max_moves: Maximum number of moves to import after start_move (default: 10)
+        quality: Quality rating for the moves
+        
+    Returns:
+        Number of moves imported
+    """
+    gs = GameState()
+    moves_processed = 0
+    moves_imported = 0
+    
+    for i, move_text in enumerate(game_moves):
+        # Skip moves that aren't actual chess moves
+        if not move_text or move_text.isdigit() or move_text.endswith('.'):
+            continue
+            
+        valid_moves = gs.getValidMoves()
+        found_move = parser.find_matching_move(move_text, valid_moves)
+        
+        if found_move:
+            # Make the move to update the board state
+            gs.makeMove(found_move)
+            moves_processed += 1
+            
+            # Only start recording moves after we've reached start_move
+            if moves_processed >= start_move:
+                # Add this position to the opening book
+                if moves_imported < max_moves:
+                    opening_book.add_position(gs.board, found_move, quality)
+                    moves_imported += 1
+                else:
+                    # We've imported the desired number of moves
+                    break
+        else:
+            print(f"Error in Game {game_number+1}, PGN move {i+1}: {move_text}")
+            print(f"Move not recognized: {move_text}, len: {len(move_text)}")
+            print(f"Valid moves: {[m.getChessNotation() for m in valid_moves]}")
+            break
+
+    return moves_imported
+
+
+def populate_mid_game_from_directory(directory_path, start_move=11, max_moves=10, quality=1):
+    """
+    Populate opening book with moves 11-20 from PGN files in a directory.
+    
+    Args:
+        directory_path: Path to directory containing PGN files
+        start_move: Move number to start importing from (default: 11)
+        max_moves: Maximum number of moves to import after start_move (default: 10)
+        quality: Quality rating for the moves
+        
+    Returns:
+        Total number of moves imported
+    """
+    book = CustomOpeningBook()
+    parser = PgnParser()
+    total_moves = 0
+    games_processed = 0
+    
+    if not os.path.isdir(directory_path):
+        print(f"Error: {directory_path} is not a valid directory")
+        return 0
+    
+    pgn_files = [f for f in os.listdir(directory_path) if f.endswith('.pgn')]
+    
+    if not pgn_files:
+        print(f"No PGN files found in {directory_path}")
+        return 0
+    
+    print(f"Found {len(pgn_files)} PGN files to process for mid-game moves {start_move}-{start_move+max_moves-1}")
+    
+    for pgn_file in pgn_files:
+        file_path = os.path.join(directory_path, pgn_file)
+        print(f"Processing {pgn_file} for mid-game moves...")
+        
+        games = parser.parse_pgn_file(file_path)
+        file_moves = 0
+        
+        for i, game_moves in enumerate(games):
+            moves_imported = import_pgn_game_mid_section(parser, game_moves, book, games_processed, 
+                                                         start_move, max_moves, quality)
+            file_moves += moves_imported
+            total_moves += moves_imported
+            games_processed += 1
+            
+            if (games_processed % 100) == 0:
+                print(f"Processed {games_processed} games, imported {total_moves} total moves")
+                book.save_book()
+        
+        print(f"Imported {file_moves} moves from {len(games)} games in {pgn_file}")
+    
+    print(f"Total mid-game moves imported: {total_moves} from {games_processed} games")
+    book.save_book()
+    return total_moves
+
 
 def import_pgn_game_improved(parser, game_moves, opening_book, game_number, max_moves=15, quality=1):
     
@@ -321,11 +435,14 @@ def populate_from_specific_games(pgn_files, max_moves=15, quality=1):
 def main():
     parser = argparse.ArgumentParser(description='Populate chess opening book from PGN files')
     
-    
     parser.add_argument('--dir', type=str, help='Directory containing PGN files to import')
     parser.add_argument('--file', type=str, nargs='+', help='Specific PGN file(s) to import')
     parser.add_argument('--max-moves', type=int, default=15, 
                         help='Maximum number of moves to import from the start of each game (default: 15)')
+    parser.add_argument('--mid-game', action='store_true',
+                        help='Import mid-game moves instead of opening moves')
+    parser.add_argument('--start-move', type=int, default=11,
+                        help='Starting move number when using --mid-game (default: 11)')
     parser.add_argument('--quality', type=float, default=1.0,
                         help='Quality rating to assign to imported moves (default: 1.0)')
     parser.add_argument('--book-file', type=str, default='opening_book.json',
@@ -333,21 +450,28 @@ def main():
     
     args = parser.parse_args()
     
-   
     if args.book_file and hasattr(OpeningBook, 'book_file'):
         os.environ['OPENING_BOOK_FILE'] = args.book_file
     
-    
-    if args.dir:
-        populate_from_directory(args.dir, args.max_moves, args.quality)
-    
-    
-    if args.file:
-        populate_from_specific_games(args.file, args.max_moves, args.quality)
-    
+    # Normal opening moves (1-10)
+    if not args.mid_game:
+        if args.dir:
+            populate_from_directory(args.dir, args.max_moves, args.quality)
+        
+        if args.file:
+            populate_from_specific_games(args.file, args.max_moves, args.quality)
+    # Mid-game moves (11-20)
+    else:
+        if args.dir:
+            populate_mid_game_from_directory(args.dir, args.start_move, args.max_moves, args.quality)
+        
+        if args.file:
+            # You would need to implement a similar function for specific files
+            print("Mid-game importing from specific files not implemented yet")
     
     if not (args.dir or args.file):
         parser.print_help()
 
 if __name__ == "__main__":
     main()
+

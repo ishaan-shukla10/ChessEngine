@@ -60,7 +60,7 @@ def main():
     sqSelected = () # coordinates of square selected by player
     playerClicks = [] # log of clicks made by player
     gameOver = False
-    playerOne = True # For white player, if true -> no computer
+    playerOne = False # For white player, if true -> no computer
     playerTwo = False # For black player, if true -> human plays
     AIThinking = False
     moveFinderProcess = None
@@ -246,7 +246,7 @@ def main():
             
             # detects mouse drag
             elif e.type == p.MOUSEMOTION:
-                if piece_dragging and e.button == 1:
+                if piece_dragging:
                     dragged_piece_pos = p.mouse.get_pos()
             
             # detect keyboard inputs
