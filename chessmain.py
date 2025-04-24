@@ -64,9 +64,7 @@ def main():
     AIThinking = False
     moveFinderProcess = None
     moveUndone = False
-    moveLogScroll = 0
-    maxScroll = 0
-    
+
     # Added variables for board flipping
     boardFlipped = False # Track if board is currently flipped (False = white's POV, True = black's POV)
     autoFlip = True # If True, board will flip automatically after each move
@@ -258,11 +256,6 @@ def main():
                 if e.key == p.K_a: # if A key pressed, toggle auto-flip
                     autoFlip = not autoFlip
                 
-                if e.key == p.K_UP:
-                    moveLogScroll = max(0, moveLogScroll-1)
-                
-                if e.key == p.K_DOWN:
-                    moveLogScroll = min(maxScroll, moveLogScroll-1)
         
         # Set board orientation if playing as black only
         if not playerOne and playerTwo and not fixedBlackPOV:
@@ -344,8 +337,6 @@ def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, piece_draggin
     highlightSquares(screen, gs, validMoves, sqSelected, boardFlipped)
     drawPieces(screen, gs.board, sqSelected, piece_dragging, dragged_piece, dragged_piece_pos, boardFlipped)
     drawMoveLog(screen, gs, moveLogFont)
-    move_count = len(gs.moveLog)
-    maxScroll = max(0, (move_count//6) - 8)
     drawNotationHelper(screen, boardFlipped)
 
 '''
@@ -450,7 +441,7 @@ def drawNotationHelper(screen, boardFlipped=False):
 '''
 draw move log to see series of moves that lead to current position in game
 '''
-def drawMoveLog(screen, gs, font, scroll=0):
+def drawMoveLog(screen, gs, font):
     moveLogRect = p.Rect(BOARD_WIDTH + NOTATION_WIDTH_VT, 0, MOVE_LOG_PANEL_WIDTH, MOVE_LOG_PANEL_HEIGHT)
     p.draw.rect(screen, p.Color("Black"), moveLogRect)
     moveLog = gs.moveLog
@@ -460,27 +451,15 @@ def drawMoveLog(screen, gs, font, scroll=0):
         if i + 1 < len(moveLog):
             moveString += str(moveLog[i+1])
         moveTexts.append(moveString)
-    
-    # Add scrolling instructions if there are enough moves to scroll
-    if len(moveTexts) > 24:  # Adjust this number based on testing
-        scrollText = font.render("Use UP/DOWN keys to scroll", True, p.Color('gray'))
-        scrollLocation = moveLogRect.move(5, MOVE_LOG_PANEL_HEIGHT - 20)
-        screen.blit(scrollText, scrollLocation)
-    
     movesPerRow = 3
     padding = 5
     textY = padding
     lineSpacing = 2
-    
-    # Apply scroll offset to decide which moves to display
-    startMove = scroll * movesPerRow
-    visibleMoves = moveTexts[startMove:startMove + 24]  # Show about 24 moves at once
-    
-    for i in range(0, len(visibleMoves), movesPerRow):
+    for i in range(0, len(moveTexts), movesPerRow):
         text = ""
         for j in range(movesPerRow):
-            if i + j < len(visibleMoves):
-                text += visibleMoves[i+j]
+            if i + j < len(moveTexts):
+                text +=  moveTexts[i+j]
         textObject = font.render(text, True, p.Color('White'))
         textLocation = moveLogRect.move(padding, textY)
         screen.blit(textObject, textLocation)
