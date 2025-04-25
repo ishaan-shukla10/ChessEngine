@@ -322,7 +322,6 @@ def populate_from_specific_games(pgn_files, max_moves=15, quality=1):
                 book.save_book()
         
         print(f"Imported {file_moves} moves from {len(games)} games in {pgn_file}")
-    
     print(f"Total moves imported: {total_moves} from {games_processed} games")
     book.save_book()
     return total_moves
