@@ -67,7 +67,7 @@ DEPTH = 2
 
 
 
-opening_book = OpeningBook()
+opening_book = OpeningBook("alekhine.json")
 USE_OPENING_BOOK = True
 MAX_BOOK_MOVE = 10  
 
@@ -225,7 +225,6 @@ def findMoveNegaMaxAlphaBeta(gs, validMoves, depth, alpha, beta, turnMultiplier)
 
 
 def scoreBoard(gs):
-
     score = 0
 
     if gs.checkmate:
@@ -235,6 +234,76 @@ def scoreBoard(gs):
             return CHECKMATE
     elif gs.stalemate:
         return STALEMATE
+    
+    white_pieces_under_attack = {}
+    black_pieces_under_attack = {}
+    
+    for row in range(8):
+        for col in range(8):
+            piece = gs.board[row][col]
+            if piece != '--':
+                is_white = piece[0] == 'w'
+                attacker_color = 'b' if is_white else 'w'
+                
+                if gs.isSquareAttacked(row, col, not is_white):
+                    attackers = gs.getAttackersOfSquare(row, col, attacker_color)
+                    lowest_attacker_value = float('inf')
+                    
+                    for att_row, att_col in attackers:
+                        att_piece = gs.board[att_row][att_col]
+                        if att_piece != '--' and att_piece[0] == attacker_color:
+                            att_value = pieceScores.get(att_piece[1], 0)
+                            lowest_attacker_value = min(lowest_attacker_value, att_value)
+                    
+                    defenders = gs.getAttackersOfSquare(row, col, piece[0])
+                    lowest_defender_value = float('inf')
+                    
+                    for def_row, def_col in defenders:
+                        def_piece = gs.board[def_row][def_col]
+                        if def_piece != '--' and def_piece[0] == piece[0]:
+                            def_value = pieceScores.get(def_piece[1], 0)
+                            lowest_defender_value = min(lowest_defender_value, def_value)
+                    
+                    piece_value = pieceScores.get(piece[1], 0)
+                    exchange_value = piece_value - lowest_attacker_value
+                    
+                    if is_white:
+                        white_pieces_under_attack[(row, col)] = {
+                            'piece': piece,
+                            'value': piece_value,
+                            'attackers': attackers,
+                            'defenders': defenders,
+                            'min_attacker_value': lowest_attacker_value,
+                            'min_defender_value': lowest_defender_value,
+                            'exchange_favorable': exchange_value <= 0 or len(defenders) > len(attackers)
+                        }
+                    else:
+                        black_pieces_under_attack[(row, col)] = {
+                            'piece': piece,
+                            'value': piece_value,
+                            'attackers': attackers,
+                            'defenders': defenders,
+                            'min_attacker_value': lowest_attacker_value,
+                            'min_defender_value': lowest_defender_value,
+                            'exchange_favorable': exchange_value <= 0 or len(defenders) > len(attackers)
+                        }
+    
+    pieces_under_attack = white_pieces_under_attack if gs.whiteToMove else black_pieces_under_attack
+    opponent_pieces_under_attack = black_pieces_under_attack if gs.whiteToMove else white_pieces_under_attack
+    
+    for coords, data in pieces_under_attack.items():
+        if not data['defenders']:  
+            score -= data['value'] * 0.5 if gs.whiteToMove else -data['value'] * 0.5
+        elif not data['exchange_favorable']: 
+            potential_loss = data['value'] - data['min_attacker_value']
+            score -= potential_loss * 0.3 if gs.whiteToMove else -potential_loss * 0.3
+    
+    for coords, data in opponent_pieces_under_attack.items():
+        if not data['defenders']:  
+            score += data['value'] * 0.5 if gs.whiteToMove else -data['value'] * 0.5
+        elif not data['exchange_favorable']:  
+            potential_gain = data['value'] - data['min_attacker_value']
+            score += potential_gain * 0.3 if gs.whiteToMove else -potential_gain * 0.3
     
     pins = gs.detectAllPins()
     pinned_pieces = [(pin[0], pin[1]) for pin in pins]
@@ -257,14 +326,11 @@ def scoreBoard(gs):
             piece = gs.board[r][c]
             if piece != '--':
                 if (gs.whiteToMove and piece[0] == 'w') or (not gs.whiteToMove and piece[0] == 'b'):
-                    
                     attack_squares = gs.getPieceAttackSquares(r, c)
                     if attack_squares:
                         for square in attack_squares:
                             if square in pinned_pieces:
                                 target_piece = gs.board[square[0]][square[1]]
-                                
-                                
                                 if target_piece[1] != 'p':
                                     attacking_pinned_pieces.append({
                                         'attacker': (r, c),
@@ -275,12 +341,8 @@ def scoreBoard(gs):
 
     for attack in attacking_pinned_pieces:
         pin_bonus = attack['piece_value'] * 0.3  
-        
-        
         if attack['is_king_pin']:
             pin_bonus *= 1.5
-            
-        
         if gs.whiteToMove:
             score += pin_bonus
         else:
@@ -291,6 +353,124 @@ def scoreBoard(gs):
         score += 0.2 if gs.whiteToMove else -0.2
     gs.whiteToMove = not gs.whiteToMove
 
+    white_pawns_by_file = [[] for _ in range(8)]
+    black_pawns_by_file = [[] for _ in range(8)]
+    
+    white_king_pos = None
+    black_king_pos = None
+    
+    for row in range(8):
+        for col in range(8):
+            piece = gs.board[row][col]
+            if piece == 'wp':
+                white_pawns_by_file[col].append(row)
+            elif piece == 'bp':
+                black_pawns_by_file[col].append(row)
+            elif piece == 'wK':
+                white_king_pos = (row, col)
+            elif piece == 'bK':
+                black_king_pos = (row, col)
+    
+    for col in range(8):
+        if len(white_pawns_by_file[col]) > 1:
+            doubled_penalty = 0.3 * (len(white_pawns_by_file[col]) - 1)
+            
+            if white_king_pos and white_king_pos[0] >= 6:
+                king_file = white_king_pos[1]
+                if abs(col - king_file) <= 1:  
+                    doubled_penalty *= 1.5  
+            
+            score -= doubled_penalty
+        
+        if len(black_pawns_by_file[col]) > 1:
+            doubled_penalty = 0.3 * (len(black_pawns_by_file[col]) - 1)
+            
+            if black_king_pos and black_king_pos[0] <= 1: 
+                king_file = black_king_pos[1]
+                if abs(col - king_file) <= 1:  
+                    doubled_penalty *= 1.5 
+            
+            score += doubled_penalty
+    
+    for col in range(8):
+        if white_pawns_by_file[col] and (col == 0 or not white_pawns_by_file[col-1]) and (col == 7 or not white_pawns_by_file[col+1]):
+            isolated_penalty = 0.2 * len(white_pawns_by_file[col])
+            
+            if white_king_pos and white_king_pos[0] >= 6:  
+                king_file = white_king_pos[1]
+                if abs(col - king_file) <= 1: 
+                    isolated_penalty *= 1.5 
+            
+            score -= isolated_penalty
+        
+        if black_pawns_by_file[col] and (col == 0 or not black_pawns_by_file[col-1]) and (col == 7 or not black_pawns_by_file[col+1]):
+            isolated_penalty = 0.2 * len(black_pawns_by_file[col])
+            
+            if black_king_pos and black_king_pos[0] <= 1:  
+                king_file = black_king_pos[1]
+                if abs(col - king_file) <= 1:  
+                    isolated_penalty *= 1.5 
+            
+            score += isolated_penalty
+    
+    white_passed_pawns = []
+    black_passed_pawns = []
+    
+    for col in range(8):
+        passed_rank = None
+        for row in range(7, -1, -1):  
+            if gs.board[row][col] == 'wp':
+                passed_rank = row
+                break
+        
+        if passed_rank is not None:
+            is_passed = True
+            for r in range(passed_rank-1, -1, -1):  
+                for c in range(max(0, col-1), min(8, col+2)): 
+                    if gs.board[r][c] == 'bp':
+                        is_passed = False
+                        break
+                if not is_passed:
+                    break
+            
+            if is_passed:
+                white_passed_pawns.append((passed_rank, col))
+        
+        passed_rank = None
+        for row in range(8):  
+            if gs.board[row][col] == 'bp':
+                passed_rank = row
+                break
+        
+        if passed_rank is not None:
+            is_passed = True
+            for r in range(passed_rank+1, 8):  
+                for c in range(max(0, col-1), min(8, col+2)): 
+                    if gs.board[r][c] == 'wp':
+                        is_passed = False
+                        break
+                if not is_passed:
+                    break
+            
+            if is_passed:
+                black_passed_pawns.append((passed_rank, col))
+    
+    for rank, file in white_passed_pawns:
+        distance_to_promotion = rank
+        promotion_value = (7 - distance_to_promotion) * 0.2
+        score += 0.5 + promotion_value
+        
+        if rank <= 2: 
+            score += (3 - rank) * 0.3
+    
+    for rank, file in black_passed_pawns:
+        distance_to_promotion = 7 - rank
+        promotion_value = (7 - distance_to_promotion) * 0.2
+        score -= 0.5 + promotion_value
+        
+        if rank >= 5:  
+            score -= (rank - 4) * 0.3
+    
     totalAttacks = gs.white_attacks['total'] if gs.whiteToMove else gs.black_attacks['total']
     totalDefends = gs.white_defends['total'] if gs.whiteToMove else gs.black_defends['total']
 
@@ -298,7 +478,7 @@ def scoreBoard(gs):
         score += totalAttacks * 0.15 + totalDefends * 0.1
     else:
         score -= totalAttacks * 0.15 + totalDefends * 0.1
-
+    
     for row in range(len(gs.board)):
         for col in range(len(gs.board[row])):
             square = gs.board[row][col]
@@ -310,35 +490,71 @@ def scoreBoard(gs):
                     else:
                         piecePositionScore = piecePositionScores[square[1]][row][col]
                 
-                
                 pin_maintainer_bonus = 0
                 if (row, col) in [attack['attacker'] for attack in attacking_pinned_pieces]:
                     pin_maintainer_bonus = 0.5  
                 
-                
                 piece_value = pieceScores[square[1]]
+                
+                material_factor = 1.0 
                 if square[0] == 'w':
-                    score += piece_value + piecePositionScore * 0.1 + pin_maintainer_bonus
+                   
+                    if gs.whiteToMove and len(black_pieces_under_attack) > 0:
+                       
+                        material_factor = 0.8
+                    
+                    
+                    if len(white_passed_pawns) > 0 and any(rank <= 2 for rank, _ in white_passed_pawns):
+                        
+                        material_factor = 0.85
+                        
+                    score += piece_value * material_factor + piecePositionScore * 0.1 + pin_maintainer_bonus
+                
                 elif square[0] == 'b':
-                    score -= piece_value + piecePositionScore * 0.1 + pin_maintainer_bonus
+                    
+                    if not gs.whiteToMove and len(white_pieces_under_attack) > 0:
+                        
+                        material_factor = 0.8
+                    
+                    
+                    if len(black_passed_pawns) > 0 and any(rank >= 5 for rank, _ in black_passed_pawns):
+                        
+                        material_factor = 0.85
+                        
+                    score -= piece_value * material_factor + piecePositionScore * 0.1 + pin_maintainer_bonus
                 
-                
+               
                 if (row, col) in pinned_pieces:
                     pin_info = pinned_pieces_info[(row, col)]
                     
                     pin_penalty = piece_value * 0.15  
                     
-                   
                     if pin_info['is_king_pin']:
                         pin_penalty *= 1.3
                     
-                   
                     if square[0] == 'w':
                         score -= pin_penalty
                     else:
                         score += pin_penalty
     
     return score
+
+
+def getAttackersOfSquare(self, row, col, color):
+    attackers = []
+    for r in range(8):
+        for c in range(8):
+            piece = self.board[r][c]
+            if piece != '--' and piece[0] == color:
+                attack_squares = self.getPieceAttackSquares(r, c)
+                if (row, col) in attack_squares:
+                    attackers.append((r, c))
+    return attackers
+
+
+def isSquareDefended(self, row, col, by_white):
+    defenders = self.getAttackersOfSquare(row, col, 'w' if by_white else 'b')
+    return len(defenders) > 0
 
 
 def scoreMaterial(board):
