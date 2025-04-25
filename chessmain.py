@@ -60,7 +60,7 @@ def main():
     sqSelected = () # coordinates of square selected by player
     playerClicks = [] # log of clicks made by player
     gameOver = False
-    playerOne = False # For white player, if true -> no computer
+    playerOne = True # For white player, if true -> no computer
     playerTwo = False # For black player, if true -> human plays
     AIThinking = False
     moveFinderProcess = None

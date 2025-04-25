@@ -1,7 +1,7 @@
 tell it that pins are good - done
 adding pressure to pin - done
-attack unprotected pawns (concept of weakness)
-double/ isolated pawn weaknesses
+attack unprotected pawns (concept of weakness) - done
+double/ isolated pawn weaknesses - done
 king protection points - done
 striking at center at start of game
 adding points for pins/checks - done
