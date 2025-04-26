@@ -60,8 +60,8 @@ def main():
     sqSelected = () # coordinates of square selected by player
     playerClicks = [] # log of clicks made by player
     gameOver = False
-    playerOne = False # For white player, if true -> no computer
-    playerTwo = False # For black player, if true -> human plays
+    playerOne = True # For white player, if true -> no computer
+    playerTwo = True # For black player, if true -> human plays
     AIThinking = False
     moveFinderProcess = None
     moveUndone = False
@@ -75,6 +75,8 @@ def main():
     startDrawingArrow = False
     startCoordArrows = ()
     endCoordArrows = ()
+    rightClickedSquares = []
+    arrows = []
 
     # necessary variables for dragging and dropping pieces
     piece_dragging = False
@@ -94,6 +96,8 @@ def main():
             # detect mouse clicks and movements
             elif e.type == p.MOUSEBUTTONDOWN:
                     if not gameOver and humanTurn and e.button == 1: # LMB clicks and drags
+                        rightClickedSquares = []
+                        arrows = []
                         location = p.mouse.get_pos() # get current location of mouse cursor click
                         
                         # Adjust column based on board orientation
@@ -145,7 +149,7 @@ def main():
                                 playerClicks = [sqSelected]
                         
                     if e.button == 3:
-                        startDrawingArrow = True
+                        
                         location = p.mouse.get_pos()
                         col = (location[0] - NOTATION_WIDTH_VT) // SQ_SIZE
                         row = location[1] // SQ_SIZE
@@ -155,11 +159,17 @@ def main():
                             row = 7 - row
 
                         if 0 <= row < 8 and 0 <= col < 8:
+                            if (row, col) not in rightClickedSquares:
+                                rightClickedSquares.append((row, col))
+                        
+                            startDrawingArrow = True
                             startCoordArrows = (row, col)
+
 
 
             # when stopped clicking    
             elif e.type == p.MOUSEBUTTONUP:
+
                 if piece_dragging and e.button == 1: # if was LMB
                     location = p.mouse.get_pos()
                     col = (location[0] - NOTATION_WIDTH_VT) // SQ_SIZE
@@ -241,6 +251,8 @@ def main():
 
                     if 0 <= row < 8 and 0 <= col < 8:
                         endCoordArrows = (row, col)
+                        if startCoordArrows != (row, col):
+                            arrows.append((startCoordArrows, endCoordArrows))
                         startDrawingArrow = False
                     
             
@@ -270,6 +282,7 @@ def main():
                     validMoves = gs.getValidMoves()
                     sqSelected = ()
                     playerClicks = []
+                    rightClickedSquares = []
                     moveMade = False
                     animate = False
                     gameOver = False
@@ -330,7 +343,7 @@ def main():
             moveUndone = False
 
         # draw the board representing current game state
-        drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, startCoordArrows, endCoordArrows, piece_dragging, dragged_piece, dragged_piece_pos, boardFlipped)
+        drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, startCoordArrows, endCoordArrows, piece_dragging, dragged_piece, dragged_piece_pos, boardFlipped, rightClickedSquares, arrows)
         
         # Draw board orientation controls
         drawBoardControls(screen, autoFlip, boardFlipped)
@@ -419,11 +432,17 @@ def playMoveSound(move, gs):
 '''
 draw board, highlighted squares if clicked, pieces, move log and notation helpers
 '''
-def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, startCoordArrows, endCoordArrows, piece_dragging=False, dragged_piece=None, dragged_piece_pos=(), boardFlipped=False):
+def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, startCoordArrows, endCoordArrows, piece_dragging=False, dragged_piece=None, dragged_piece_pos=(), boardFlipped=False, rightClickedSquares=None, arrows=None):
     drawBoard(screen)
-    highlightSquares(screen, gs, validMoves, sqSelected, boardFlipped)
+    highlightSquares(screen, gs, validMoves, sqSelected, rightClickedSquares, boardFlipped)
+
+    if arrows:
+        for start, end in arrows:
+            drawArrow(screen, start, end, boardFlipped)
+
     if startCoordArrows != () and endCoordArrows != ():
         drawArrow(screen, startCoordArrows, endCoordArrows, boardFlipped)
+    
     drawPieces(screen, gs.board, sqSelected, piece_dragging, dragged_piece, dragged_piece_pos, boardFlipped)
     drawMoveLog(screen, gs, moveLogFont)
     drawNotationHelper(screen, boardFlipped)
@@ -442,7 +461,12 @@ def drawBoard(screen):
 '''
 highlight valid moves when clicked on a piece
 '''
-def highlightSquares(screen, gs, validMoves, sqSelected, boardFlipped=False):
+def highlightSquares(screen, gs, validMoves, sqSelected, rightClickedSquares = None, boardFlipped=False):
+
+    if rightClickedSquares is None:
+        rightClickedSquares = []
+
+
     if sqSelected != ():
         r, c = sqSelected
         if 0 <= r < 8 and 0 <= c < 8:
@@ -466,6 +490,20 @@ def highlightSquares(screen, gs, validMoves, sqSelected, boardFlipped=False):
                             draw_end_r, draw_end_c = 7 - move.endRow, 7 - move.endCol
                         
                         screen.blit(s, (NOTATION_WIDTH_VT + draw_end_c*SQ_SIZE, draw_end_r*SQ_SIZE))
+    
+    for square in rightClickedSquares:
+        r, c = square
+        if 0 <= r < 8 and 0 <= c < 8:
+            s = p.Surface((SQ_SIZE, SQ_SIZE))
+            s.set_alpha(100)  # Transparency
+            s.fill(p.Color('red'))  # Red highlight
+            
+            # Convert screen coordinates based on board orientation
+            draw_r, draw_c = r, c
+            if boardFlipped:
+                draw_r, draw_c = 7 - r, 7 - c
+            
+            screen.blit(s, (NOTATION_WIDTH_VT + draw_c*SQ_SIZE, draw_r*SQ_SIZE))
 
 '''
 draw pieces on top of board and highlight squares
@@ -660,6 +698,7 @@ def drawPromotionSelection(screen, row, col, is_white, boardFlipped=False):
             if e.type == p.QUIT:
                 return 'Q' 
             elif e.type == p.MOUSEBUTTONDOWN:
+
                 location = p.mouse.get_pos()
                 click_col = (location[0] - NOTATION_WIDTH_VT) // SQ_SIZE
                 click_row = location[1] // SQ_SIZE
