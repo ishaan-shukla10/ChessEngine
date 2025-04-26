@@ -110,7 +110,7 @@ class OpeningBook:
         
         return position_hash
     
-    def get_book_move(self, board, white_to_move=None, castling_rights=None, en_passant_col=None, selection_mode="mixed"):
+    def get_book_move(self, board, white_to_move=None, castling_rights=None, en_passant_col=None):
     
         position_hash = self.get_position_hash(board)
     
@@ -121,46 +121,16 @@ class OpeningBook:
     
         if not moves:
             return None
-    
-    
-        if selection_mode == "random":
-        # Completely random selection (equal probability)
-            move_data = random.choice(moves)
-            return self.json_move_to_move_object(move_data, board)
-    
-        elif selection_mode == "quality":
-        # Weight by quality instead of frequency
-            total_quality = sum(move["quality"] for move in moves)
-            choice = random.random() * total_quality
+
+        weights = [move["freq"] ** 0.5 * move["quality"] for move in moves]
+        total_weight = sum(weights)
+        choice = random.random() * total_weight
         
-            current = 0
-            for move_data in moves:
-                current += move_data["quality"]
-                if current >= choice:
-                    return self.json_move_to_move_object(move_data, board)
-    
-        elif selection_mode == "mixed":
-        # Mixed approach - use sqrt of frequency to reduce impact of high frequency moves
-            weights = [move["freq"] ** 0.5 * move["quality"] for move in moves]
-            total_weight = sum(weights)
-            choice = random.random() * total_weight
-        
-            current = 0
-            for i, move_data in enumerate(moves):
-                current += weights[i]
-                if current >= choice:
-                    return self.json_move_to_move_object(move_data, board)
-    
-        else:  
-        # weighted frequency selection
-            total_freq = sum(move["freq"] for move in moves)
-            choice = random.random() * total_freq
-        
-            current = 0
-            for move_data in moves:
-                current += move_data["freq"]
-                if current >= choice:
-                    return self.json_move_to_move_object(move_data, board)
+        current = 0
+        for i, move_data in enumerate(moves):
+            current += weights[i]
+            if current >= choice:
+                return self.json_move_to_move_object(move_data, board)
     
     
         return self.json_move_to_move_object(moves[0], board)

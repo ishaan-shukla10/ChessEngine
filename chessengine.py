@@ -1,4 +1,4 @@
-from helper_functions import initMvvLva, isValidEnPassant
+from helper_functions import isValidEnPassant
 
 
 pieceScores = {'K': 0, 'p': 1, 'N': 3, 'B': 3, 'R': 5, 'Q': 9}
@@ -45,13 +45,16 @@ class GameState():
         self.white_defends = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
         self.black_defends = {'p': 0, 'R': 0, 'N': 0, 'B': 0, 'Q': 0, 'K': 0, 'total': 0}
 
-        self.mvv_lva = initMvvLva()
+        self.num_moves = 0
+        self.whiteHasCastled = False
+        self.blackHasCastled = False
 
 
     def makeMove(self, move):
         self.board[move.startRow][move.startCol] = "--"
         self.board[move.endRow][move.endCol] = move.pieceMoved
         self.moveLog.append(move)
+        self.num_moves += 1
         self.whiteToMove = not self.whiteToMove
 
         self.countAttacksAndDefends()
@@ -83,6 +86,10 @@ class GameState():
             else:
                 self.board[move.endRow][move.endCol+1] = self.board[move.endRow][move.endCol-2]
                 self.board[move.endRow][move.endCol-2] = '--'
+            if move.pieceMoved[0] == 'w':
+                self.whiteHasCastled = True
+            else:
+                self.blackHasCastled = True
 
         self.enPassantPossibleLog.append(self.enPassantPossible)
 
@@ -96,6 +103,7 @@ class GameState():
     def undoMove(self):
         if len(self.moveLog) != 0:
             move = self.moveLog.pop()
+            self.num_moves -= 1
             self.board[move.startRow][move.startCol] = move.pieceMoved
             self.board[move.endRow][move.endCol] = move.pieceCaptured
             self.whiteToMove = not self.whiteToMove
@@ -386,16 +394,6 @@ class GameState():
 
         self.undoMove()
 
-        if move.isCapture:
-            attacker_piece = move.pieceMoved[1]
-            victim_piece = move.pieceCaptured[1]
-        
-            if attacker_piece in self.mvv_lva and victim_piece in self.mvv_lva[attacker_piece]:
-            
-                score += 1000 + self.mvv_lva[attacker_piece][victim_piece]
-            else:
-            
-                score += 1000
 
         enemy_color = 'b' if self.whiteToMove else 'w'
         r, c = move.endRow, move.endCol
@@ -425,7 +423,7 @@ class GameState():
                 pawn_advance = move.endRow  
         
         
-            score += pawn_advance * 10
+            score += pawn_advance * 2
     
     
         if move.isCastleMove:

@@ -60,7 +60,7 @@ def main():
     sqSelected = () # coordinates of square selected by player
     playerClicks = [] # log of clicks made by player
     gameOver = False
-    playerOne = True # For white player, if true -> no computer
+    playerOne = False # For white player, if true -> no computer
     playerTwo = False # For black player, if true -> human plays
     AIThinking = False
     moveFinderProcess = None
@@ -399,13 +399,20 @@ def drawArrow(screen, start, end, boardFlipped=False):
 '''
 play sounds according to type of each move
 ''' 
+playedOnceWhite = False
+playedOnceBlack = False
 def playMoveSound(move, gs):
+    global playedOnceBlack, playedOnceWhite
     if gs.inCheck():
         p.mixer.Sound.play(SOUNDS["move-check"])
     elif move.isCapture:
         p.mixer.Sound.play(SOUNDS["capture"])
-    elif move.isCastleMove:
+    elif gs.whiteHasCastled and not playedOnceWhite:
         p.mixer.Sound.play(SOUNDS["castle"])
+        playedOnceWhite = True
+    elif gs.blackHasCastled and not playedOnceBlack:
+        p.mixer.Sound.play(SOUNDS["castle"])
+        playedOnceBlack = True
     else:
         p.mixer.Sound.play(SOUNDS["move-self"])
 

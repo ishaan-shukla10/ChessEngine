@@ -9,7 +9,7 @@ teaching forks
 exchange pieces if materially up
 do not stalemate if materially up
 threatening a major piece with a minor one is good - done
-chess notations update for pawn promotion and cases like Nbd2
+chess notations update for pawn promotion and cases like Nbd2 - done
 concept of batteries
 heuristics like rook on open files, bishop and queen pins
 Transposition table and zorbius hashing - done
@@ -17,4 +17,6 @@ do not repeat moves if materially up (3 move and 50 move rules)
 attack only if num attackers on a piece > num defenders
 training from 10th opening (right now only first 10 opening moves from openings, also quality given = 2.0)
 draw arrows using RMB for easier calculation
-exponential growth of a penalty function if not castled after 8-10 moves
+exponential growth of a penalty function if not castled after 8-10 moves - done
+teaching that center control is important throughout the game and especially in the opening
+additional heuristics based on number of squares controlled (bishop unblocked and not starin towards a pawn chain, and knight at center)
