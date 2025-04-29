@@ -61,7 +61,7 @@ def main():
     playerClicks = [] # log of clicks made by player
     gameOver = False
     playerOne = True # For white player, if true -> no computer
-    playerTwo = True # For black player, if true -> human plays
+    playerTwo = False # For black player, if true -> human plays
     AIThinking = False
     moveFinderProcess = None
     moveUndone = False
@@ -71,6 +71,8 @@ def main():
     autoFlip = True # If True, board will flip automatically after each move
     fixedBlackPOV = not playerOne and playerTwo # If True, board will stay in black's POV
 
+    # Track last move made
+    lastMove = None
 
     startDrawingArrow = False
     startCoordArrows = ()
@@ -133,6 +135,7 @@ def main():
                             for i in range(len(validMoves)):
                                 if move == validMoves[i]: # if move is valid
                                     gs.makeMove(validMoves[i]) # make the move
+                                    lastMove = validMoves[i]  # Store the last move made
                                     moveMade = True
                                     playMoveSound(move, gs) # play sound accordingly
                                     animate = True # for animations
@@ -220,6 +223,7 @@ def main():
                                         validMoves[i].promotionChoice = promotionChoice
                                     
                                     gs.makeMove(validMoves[i])
+                                    lastMove = validMoves[i]  # Store the last move made
                                     moveMade = True
                                     playMoveSound(move, gs)
                                     animate = False
@@ -273,6 +277,12 @@ def main():
                         AIThinking = False
                     moveUndone = True
                     
+                    # Update lastMove when undoing a move
+                    if len(gs.moveLog) > 0:
+                        lastMove = gs.moveLog[-1]
+                    else:
+                        lastMove = None
+                    
                     # When undoing a move, flip the board too if autoFlip is enabled
                     if autoFlip and not fixedBlackPOV:
                         boardFlipped = not boardFlipped
@@ -290,6 +300,7 @@ def main():
                         moveFinderProcess.terminate()
                         AIThinking = False
                     moveUndone = True
+                    lastMove = None  # Reset lastMove
                     
                     # Reset board orientation
                     if fixedBlackPOV:
@@ -324,6 +335,7 @@ def main():
                 if AIMove is None: # if all moves lead to same score, then choose randomly
                     AIMove = smartmovefinder.findRandomMove(validMoves)
                 gs.makeMove(AIMove)
+                lastMove = AIMove  # Store the AI's move as the last move
                 moveMade = True
                 playMoveSound(AIMove, gs)
                 animate = True
@@ -343,7 +355,7 @@ def main():
             moveUndone = False
 
         # draw the board representing current game state
-        drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, startCoordArrows, endCoordArrows, piece_dragging, dragged_piece, dragged_piece_pos, boardFlipped, rightClickedSquares, arrows)
+        drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, startCoordArrows, endCoordArrows, piece_dragging, dragged_piece, dragged_piece_pos, boardFlipped, rightClickedSquares, arrows, lastMove)
         
         # Draw board orientation controls
         drawBoardControls(screen, autoFlip, boardFlipped)
@@ -357,7 +369,12 @@ def main():
                 drawEndGameText(screen, 'White wins by checkmate')
         elif gs.stalemate:
             gameOver = True
-            drawEndGameText(screen, 'Stalemate')
+            if gs.is_threefold_repetition():
+                drawEndGameText(screen, 'Draw by threefold repetition')
+            elif gs.is_fifty_move_rule():
+                drawEndGameText(screen, 'Draw by 50-move rule')
+            else:
+                drawEndGameText(screen, 'Stalemate')
 
         clock.tick(MAX_FPS) # set FPS
         p.display.flip()
@@ -432,9 +449,9 @@ def playMoveSound(move, gs):
 '''
 draw board, highlighted squares if clicked, pieces, move log and notation helpers
 '''
-def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, startCoordArrows, endCoordArrows, piece_dragging=False, dragged_piece=None, dragged_piece_pos=(), boardFlipped=False, rightClickedSquares=None, arrows=None):
+def drawGameState(screen, gs, validMoves, sqSelected, moveLogFont, startCoordArrows, endCoordArrows, piece_dragging=False, dragged_piece=None, dragged_piece_pos=(), boardFlipped=False, rightClickedSquares=None, arrows=None, lastMove=None):
     drawBoard(screen)
-    highlightSquares(screen, gs, validMoves, sqSelected, rightClickedSquares, boardFlipped)
+    highlightSquares(screen, gs, validMoves, sqSelected, rightClickedSquares, boardFlipped, lastMove)
 
     if arrows:
         for start, end in arrows:
@@ -459,14 +476,32 @@ def drawBoard(screen):
             p.draw.rect(screen, color, p.Rect(NOTATION_WIDTH_VT + c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 '''
-highlight valid moves when clicked on a piece
+highlight valid moves when clicked on a piece and highlight last move
 '''
-def highlightSquares(screen, gs, validMoves, sqSelected, rightClickedSquares = None, boardFlipped=False):
-
+def highlightSquares(screen, gs, validMoves, sqSelected, rightClickedSquares = None, boardFlipped=False, lastMove=None):
     if rightClickedSquares is None:
         rightClickedSquares = []
 
+    # Highlight last move with light blue color
+    if lastMove is not None:
+        s = p.Surface((SQ_SIZE, SQ_SIZE))
+        s.set_alpha(100)  # Transparency
+        s.fill(p.Color(60, 83, 204))
+        
+        # Highlight start square
+        start_r, start_c = lastMove.startRow, lastMove.startCol
+        end_r, end_c = lastMove.endRow, lastMove.endCol
+        
+        # Convert coordinates based on board orientation
+        if boardFlipped:
+            start_r, start_c = 7 - start_r, 7 - start_c
+            end_r, end_c = 7 - end_r, 7 - end_c
+        
+        # Draw highlights for start and end squares
+        screen.blit(s, (NOTATION_WIDTH_VT + start_c*SQ_SIZE, start_r*SQ_SIZE))
+        screen.blit(s, (NOTATION_WIDTH_VT + end_c*SQ_SIZE, end_r*SQ_SIZE))
 
+    # Highlight selected square and valid moves
     if sqSelected != ():
         r, c = sqSelected
         if 0 <= r < 8 and 0 <= c < 8:
@@ -491,6 +526,7 @@ def highlightSquares(screen, gs, validMoves, sqSelected, rightClickedSquares = N
                         
                         screen.blit(s, (NOTATION_WIDTH_VT + draw_end_c*SQ_SIZE, draw_end_r*SQ_SIZE))
     
+    # Highlight right-clicked squares
     for square in rightClickedSquares:
         r, c = square
         if 0 <= r < 8 and 0 <= c < 8:

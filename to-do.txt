@@ -10,12 +10,13 @@ Transposition table and zorbius hashing - done
 draw arrows using RMB for easier calculation - done
 exponential growth of a penalty function if not castled after 8-10 moves - done
 heuristics like rook on open files, bishop and queen pins - done
-teaching forks
+do not repeat moves if materially up (3 move and 50 move rules) - done
+teaching forks - done
+attack only if num attackers on a piece > num defenders - done
 exchange pieces if materially up
 do not stalemate if materially up
 concept of batteries
-do not repeat moves if materially up (3 move and 50 move rules)
-attack only if num attackers on a piece > num defenders
 teaching that center control is important throughout the game and especially in the opening
 additional heuristics based on number of squares controlled (bishop unblocked and not starin towards a pawn chain, and knight at center)
 training from 10th opening (right now only first 10 opening moves from openings, also quality given = 2.0) - long term
+using neural network to train it on puzzles - long term

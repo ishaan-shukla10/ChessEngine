@@ -49,11 +49,11 @@ piecePositionScores = {'N': knightScores, 'Q': queenScores, 'R': rookScores, 'B'
 
 CHECKMATE = 1000
 STALEMATE = 0
-DEPTH = 3
+DEPTH = 2
 
 
 
-opening_book = OpeningBook("opening_books/bogo.json")
+opening_book = OpeningBook("opening_books/carokann.json")
 USE_OPENING_BOOK = True
 MAX_BOOK_MOVE = 10  
 
@@ -187,6 +187,7 @@ def findMoveNegaMaxAlphaBeta(gs, validMoves, depth, alpha, beta, turnMultiplier)
 
     maxScore = -CHECKMATE
     for move in validMoves:
+        
         gs.makeMove(move)
         nextMoves = gs.getValidMoves()
         score = -findMoveNegaMaxAlphaBeta(gs, nextMoves, depth-1, -beta, -alpha, -turnMultiplier)
@@ -210,6 +211,407 @@ def findMoveNegaMaxAlphaBeta(gs, validMoves, depth, alpha, beta, turnMultiplier)
     return maxScore
 
 
+
+
+
+def detectForks(gs, color):
+    """
+    Detects forks for all piece types - situations where one piece attacks 
+    two or more valuable pieces simultaneously.
+    
+    Args:
+        gs: GameState object
+        color: 'w' for white, 'b' for black
+        
+    Returns:
+        A list of dictionaries containing information about each fork.
+    """
+    forks = []
+    attacking_color = color
+    defending_color = 'b' if color == 'w' else 'w'
+    
+    # Get all pieces of the attacking color
+    attacking_pieces = []
+    for row in range(8):
+        for col in range(8):
+            piece = gs.board[row][col]
+            if piece != '--' and piece[0] == attacking_color:
+                attacking_pieces.append((row, col, piece))
+    
+    # For each attacking piece, check if it attacks multiple valuable pieces
+    for attacker_row, attacker_col, attacker in attacking_pieces:
+        # Get attack squares based on piece type
+        if attacker[1] == 'p':
+            attack_squares = []
+            # Pawns attack diagonally
+            if attacker[0] == 'w':
+                if attacker_row > 0:
+                    if attacker_col > 0:
+                        attack_squares.append((attacker_row - 1, attacker_col - 1))
+                    if attacker_col < 7:
+                        attack_squares.append((attacker_row - 1, attacker_col + 1))
+            else:  # Black pawn
+                if attacker_row < 7:
+                    if attacker_col > 0:
+                        attack_squares.append((attacker_row + 1, attacker_col - 1))
+                    if attacker_col < 7:
+                        attack_squares.append((attacker_row + 1, attacker_col + 1))
+        else:
+            # For other pieces, use the existing attack square function
+            attack_squares = gs.getPieceAttackSquares(attacker_row, attacker_col)
+        
+        if not attack_squares:
+            continue
+            
+        # Find valuable targets being attacked
+        valuable_targets = []
+        for target_row, target_col in attack_squares:
+            target = gs.board[target_row][target_col]
+            # Only consider opponent's pieces as targets
+            if target != '--' and target[0] == defending_color:
+                # Consider piece value - kings are always valuable
+                if target[1] == 'K' or pieceScores[target[1]] >= 3:  # Only consider valuable pieces (≥ knight)
+                    valuable_targets.append((target_row, target_col, target))
+        
+        # If attacking multiple valuable pieces, it's a fork
+        if len(valuable_targets) >= 2:
+            # Calculate fork value based on the pieces being attacked
+            fork_value = sum(pieceScores[target[1]] for _, _, target in valuable_targets)
+            
+            # Add piece type to the fork info
+            forks.append({
+                'attacker': (attacker_row, attacker_col, attacker),
+                'targets': valuable_targets,
+                'value': fork_value,
+                'piece_type': attacker[1]
+            })
+    
+    return forks
+
+
+def evaluateForkPotential(gs):
+    """
+    Evaluates potential fork positions for all piece types based on mobility
+    and proximity to opponent's valuable pieces.
+    
+    Returns:
+        A score reflecting fork potential, positive for white advantage
+    """
+    fork_potential_score = 0
+    
+    # Dictionary for piece mobility - how many squares they can potentially attack
+    piece_mobility = {
+        'N': evaluate_knight_fork_potential(gs, 'w', 'b'),
+        'B': evaluate_bishop_fork_potential(gs, 'w', 'b'),
+        'R': evaluate_rook_fork_potential(gs, 'w', 'b'),
+        'Q': evaluate_queen_fork_potential(gs, 'w', 'b'),
+        'p': evaluate_pawn_fork_potential(gs, 'w', 'b')
+    }
+    
+    # Add up all potential scores for white pieces
+    for piece_type, potential in piece_mobility.items():
+        fork_potential_score += potential
+    
+    # Repeat for black pieces
+    black_piece_mobility = {
+        'N': evaluate_knight_fork_potential(gs, 'b', 'w'),
+        'B': evaluate_bishop_fork_potential(gs, 'b', 'w'),
+        'R': evaluate_rook_fork_potential(gs, 'b', 'w'),
+        'Q': evaluate_queen_fork_potential(gs, 'b', 'w'),
+        'p': evaluate_pawn_fork_potential(gs, 'b', 'w')
+    }
+    
+    # Subtract black potential from white potential
+    for piece_type, potential in black_piece_mobility.items():
+        fork_potential_score -= potential
+    
+    return fork_potential_score
+
+def evaluate_piece_fork_potentials(gs, attacking_color, defending_color):
+    """
+    Helper function that combines all piece-specific fork potential functions.
+    
+    Args:
+        gs: GameState object
+        attacking_color: Color of the attacking pieces ('w' or 'b')
+        defending_color: Color of the defending pieces ('w' or 'b')
+        
+    Returns:
+        Dictionary containing fork potential for each piece type
+    """
+    return {
+        'N': evaluate_knight_fork_potential(gs, attacking_color, defending_color),
+        'B': evaluate_bishop_fork_potential(gs, attacking_color, defending_color),
+        'R': evaluate_rook_fork_potential(gs, attacking_color, defending_color),
+        'Q': evaluate_queen_fork_potential(gs, attacking_color, defending_color),
+        'p': evaluate_pawn_fork_potential(gs, attacking_color, defending_color)
+    }
+
+
+# Helper functions for each piece type
+def evaluate_knight_fork_potential(gs, attacking_color, defending_color):
+    """Evaluates knight fork potential"""
+    potential_score = 0
+    
+    # Find all knights of the attacking color
+    knights = []
+    for row in range(8):
+        for col in range(8):
+            if gs.board[row][col] == attacking_color + 'N':
+                knights.append((row, col))
+    
+    # Find all valuable pieces of the defending color
+    valuable_pieces = []
+    for row in range(8):
+        for col in range(8):
+            piece = gs.board[row][col]
+            if piece != '--' and piece[0] == defending_color and (piece[1] == 'K' or pieceScores[piece[1]] >= 3):
+                valuable_pieces.append((row, col, piece))
+    
+    # For each knight, calculate fork potential
+    for knight_row, knight_col in knights:
+        potential_targets = []
+        
+        for val_row, val_col, val_piece in valuable_pieces:
+            row_diff = abs(knight_row - val_row)
+            col_diff = abs(knight_col - val_col)
+            
+            # Knight can directly attack or reach in 2 moves
+            if (row_diff == 1 and col_diff == 2) or (row_diff == 2 and col_diff == 1):
+                potential_targets.append((val_row, val_col, val_piece, 1.0))  # 1.0 = direct attack
+            elif row_diff + col_diff <= 5:
+                potential_targets.append((val_row, val_col, val_piece, 0.3))  # 0.3 = can reach in 2-3 moves
+        
+        # Calculate potential score if knight can attack multiple targets
+        if len(potential_targets) >= 2:
+            # Value decreases with more pieces to avoid overvaluation
+            proximity_score = sum(0.1 * pieceScores[piece[1]] * weight for _, _, piece, weight in potential_targets)
+            potential_score += proximity_score * 1.2  # Knights are good at forking
+    
+    return potential_score
+
+
+def evaluate_bishop_fork_potential(gs, attacking_color, defending_color):
+    """Evaluates bishop fork potential"""
+    potential_score = 0
+    
+    # Find all bishops of the attacking color
+    bishops = []
+    for row in range(8):
+        for col in range(8):
+            if gs.board[row][col] == attacking_color + 'B':
+                bishops.append((row, col))
+    
+    # Find all valuable pieces of the defending color
+    valuable_pieces = []
+    for row in range(8):
+        for col in range(8):
+            piece = gs.board[row][col]
+            if piece != '--' and piece[0] == defending_color and (piece[1] == 'K' or pieceScores[piece[1]] >= 3):
+                valuable_pieces.append((row, col, piece))
+    
+    # For each bishop, calculate fork potential
+    for bishop_row, bishop_col in bishops:
+        potential_targets = []
+        
+        for val_row, val_col, val_piece in valuable_pieces:
+            row_diff = abs(bishop_row - val_row)
+            col_diff = abs(bishop_col - val_col)
+            
+            # Bishop attacks diagonally
+            if row_diff == col_diff:
+                # Check if path is clear
+                is_clear = True
+                row_step = 1 if val_row > bishop_row else -1
+                col_step = 1 if val_col > bishop_col else -1
+                
+                check_row, check_col = bishop_row + row_step, bishop_col + col_step
+                while check_row != val_row and check_col != val_col:
+                    if gs.board[check_row][check_col] != '--':
+                        is_clear = False
+                        break
+                    check_row += row_step
+                    check_col += col_step
+                
+                if is_clear:
+                    potential_targets.append((val_row, val_col, val_piece, 1.0))  # 1.0 = direct attack
+            elif (row_diff + col_diff) % 2 == 0 and row_diff + col_diff <= 6:
+                # Can potentially reach in a couple moves
+                potential_targets.append((val_row, val_col, val_piece, 0.2))
+        
+        # Calculate potential score if bishop can attack multiple targets
+        if len(potential_targets) >= 2:
+            proximity_score = sum(0.1 * pieceScores[piece[1]] * weight for _, _, piece, weight in potential_targets)
+            potential_score += proximity_score * 1.0  # Standard weight for bishops
+    
+    return potential_score
+
+
+def evaluate_rook_fork_potential(gs, attacking_color, defending_color):
+    """Evaluates rook fork potential"""
+    potential_score = 0
+    
+    # Find all rooks of the attacking color
+    rooks = []
+    for row in range(8):
+        for col in range(8):
+            if gs.board[row][col] == attacking_color + 'R':
+                rooks.append((row, col))
+    
+    # Find all valuable pieces of the defending color
+    valuable_pieces = []
+    for row in range(8):
+        for col in range(8):
+            piece = gs.board[row][col]
+            if piece != '--' and piece[0] == defending_color and (piece[1] == 'K' or pieceScores[piece[1]] >= 3):
+                valuable_pieces.append((row, col, piece))
+    
+    # For each rook, calculate fork potential
+    for rook_row, rook_col in rooks:
+        potential_targets = []
+        
+        for val_row, val_col, val_piece in valuable_pieces:
+            # Rook attacks along ranks and files
+            if rook_row == val_row or rook_col == val_col:
+                # Check if path is clear
+                is_clear = True
+                row_step = 0 if rook_row == val_row else (1 if val_row > rook_row else -1)
+                col_step = 0 if rook_col == val_col else (1 if val_col > rook_col else -1)
+                
+                check_row, check_col = rook_row + row_step, rook_col + col_step
+                while check_row != val_row or check_col != val_col:
+                    if gs.board[check_row][check_col] != '--':
+                        is_clear = False
+                        break
+                    check_row += row_step
+                    check_col += col_step
+                
+                if is_clear:
+                    potential_targets.append((val_row, val_col, val_piece, 1.0))  # 1.0 = direct attack
+            elif abs(rook_row - val_row) + abs(rook_col - val_col) <= 4:
+                # Can potentially reach in a couple moves
+                potential_targets.append((val_row, val_col, val_piece, 0.15))
+        
+        # Calculate potential score if rook can attack multiple targets
+        if len(potential_targets) >= 2:
+            proximity_score = sum(0.1 * pieceScores[piece[1]] * weight for _, _, piece, weight in potential_targets)
+            potential_score += proximity_score * 0.9  # Slightly lower weight for rooks
+    
+    return potential_score
+
+
+def evaluate_queen_fork_potential(gs, attacking_color, defending_color):
+    """Evaluates queen fork potential"""
+    potential_score = 0
+    
+    # Find all queens of the attacking color
+    queens = []
+    for row in range(8):
+        for col in range(8):
+            if gs.board[row][col] == attacking_color + 'Q':
+                queens.append((row, col))
+    
+    # Find all valuable pieces of the defending color
+    valuable_pieces = []
+    for row in range(8):
+        for col in range(8):
+            piece = gs.board[row][col]
+            if piece != '--' and piece[0] == defending_color and (piece[1] == 'K' or pieceScores[piece[1]] >= 3):
+                valuable_pieces.append((row, col, piece))
+    
+    # For each queen, calculate fork potential
+    for queen_row, queen_col in queens:
+        potential_targets = []
+        
+        for val_row, val_col, val_piece in valuable_pieces:
+            row_diff = abs(queen_row - val_row)
+            col_diff = abs(queen_col - val_col)
+            
+            # Queen attacks along diagonals, ranks, and files
+            is_diagonal = row_diff == col_diff
+            is_straight = queen_row == val_row or queen_col == val_col
+            
+            if is_diagonal or is_straight:
+                # Check if path is clear
+                is_clear = True
+                row_step = 0
+                if queen_row != val_row:
+                    row_step = 1 if val_row > queen_row else -1
+                
+                col_step = 0
+                if queen_col != val_col:
+                    col_step = 1 if val_col > queen_col else -1
+                
+                check_row, check_col = queen_row + row_step, queen_col + col_step
+                while check_row != val_row or check_col != val_col:
+                    if gs.board[check_row][check_col] != '--':
+                        is_clear = False
+                        break
+                    check_row += row_step
+                    check_col += col_step
+                
+                if is_clear:
+                    potential_targets.append((val_row, val_col, val_piece, 1.0))  # 1.0 = direct attack
+            elif row_diff + col_diff <= 5:
+                # Can potentially reach in a couple moves
+                potential_targets.append((val_row, val_col, val_piece, 0.1))
+        
+        # Calculate potential score if queen can attack multiple targets
+        if len(potential_targets) >= 2:
+            proximity_score = sum(0.1 * pieceScores[piece[1]] * weight for _, _, piece, weight in potential_targets)
+            potential_score += proximity_score * 0.7  # Lower weight for queens (using queen for forks is not optimal)
+    
+    return potential_score
+
+
+def evaluate_pawn_fork_potential(gs, attacking_color, defending_color):
+    """Evaluates pawn fork potential"""
+    potential_score = 0
+    
+    # Find all pawns of the attacking color
+    pawns = []
+    for row in range(8):
+        for col in range(8):
+            if gs.board[row][col] == attacking_color + 'p':
+                pawns.append((row, col))
+    
+    # Find all valuable pieces of the defending color
+    valuable_pieces = []
+    for row in range(8):
+        for col in range(8):
+            piece = gs.board[row][col]
+            if piece != '--' and piece[0] == defending_color and (piece[1] == 'K' or pieceScores[piece[1]] >= 3):
+                valuable_pieces.append((row, col, piece))
+    
+    # For each pawn, calculate fork potential
+    for pawn_row, pawn_col in pawns:
+        potential_targets = []
+        
+        for val_row, val_col, val_piece in valuable_pieces:
+            # Pawns attack diagonally forward
+            if attacking_color == 'w':
+                # White pawn attacks diagonally forward
+                if pawn_row - val_row == 1 and abs(pawn_col - val_col) == 1:
+                    potential_targets.append((val_row, val_col, val_piece, 1.0))  # 1.0 = direct attack
+                elif pawn_row - val_row <= 3 and abs(pawn_col - val_col) <= 2:
+                    # Could potentially reach in a few moves
+                    potential_targets.append((val_row, val_col, val_piece, 0.15))
+            else:
+                # Black pawn attacks diagonally forward
+                if val_row - pawn_row == 1 and abs(pawn_col - val_col) == 1:
+                    potential_targets.append((val_row, val_col, val_piece, 1.0))  # 1.0 = direct attack
+                elif val_row - pawn_row <= 3 and abs(pawn_col - val_col) <= 2:
+                    # Could potentially reach in a few moves
+                    potential_targets.append((val_row, val_col, val_piece, 0.15))
+        
+        # Calculate potential score if pawn can attack multiple targets
+        if len(potential_targets) >= 2:
+            proximity_score = sum(0.1 * pieceScores[piece[1]] * weight for _, _, piece, weight in potential_targets)
+            potential_score += proximity_score * 1.5  # Higher weight for pawns (very valuable forks)
+    
+    return potential_score
+
+
 def scoreBoard(gs):
     score = 0
 
@@ -228,6 +630,59 @@ def scoreBoard(gs):
     # Add rook positioning evaluation
     rook_positioning_score = evaluateRookPositioning(gs)
     score += rook_positioning_score
+
+    white_forks = detectForks(gs, 'w')
+    black_forks = detectForks(gs, 'b')
+
+    # Process white forks
+    for fork in white_forks:
+        # Base score calculation
+        fork_score = 0.5 + (fork['value'] * 0.2)
+        
+        # Piece-specific modifiers
+        if fork['piece_type'] == 'p':
+            fork_score *= 1.5  # Pawn forks are very valuable
+        elif fork['piece_type'] == 'N':
+            fork_score *= 1.2  # Knight forks are valuable
+        elif fork['piece_type'] == 'B':
+            fork_score *= 1.1  # Bishop forks
+        elif fork['piece_type'] == 'R':
+            fork_score *= 0.9  # Rook forks
+        elif fork['piece_type'] == 'Q':
+            fork_score *= 0.8  # Queen forks (less optimal use of queen)
+        
+        # Extra bonus for forking the king
+        if any(target[2][1] == 'K' for target in fork['targets']):
+            fork_score *= 1.5
+        
+        score += fork_score
+
+    # Process black forks
+    for fork in black_forks:
+        # Base score calculation
+        fork_score = 0.5 + (fork['value'] * 0.2)
+        
+        # Piece-specific modifiers
+        if fork['piece_type'] == 'p':
+            fork_score *= 1.5
+        elif fork['piece_type'] == 'N':
+            fork_score *= 1.2
+        elif fork['piece_type'] == 'B':
+            fork_score *= 1.1
+        elif fork['piece_type'] == 'R':
+            fork_score *= 0.9
+        elif fork['piece_type'] == 'Q':
+            fork_score *= 0.8
+        
+        # Extra bonus for forking the king
+        if any(target[2][1] == 'K' for target in fork['targets']):
+            fork_score *= 1.5
+        
+        score -= fork_score
+
+    # Add evaluation of fork potential for all pieces
+    fork_potential = evaluateForkPotential(gs)
+    score += fork_potential
     
     pins = gs.detectAllPins()
     pinned_pieces = [(pin[0], pin[1]) for pin in pins]
@@ -323,11 +778,11 @@ def scoreBoard(gs):
                     else:
                         score += pin_penalty
 
-    if gs.num_moves > 15:
-        if not gs.blackHasCastled:
-            score += 2 ** (gs.num_moves - 15)
-        if not gs.whiteHasCastled:
-            score -= 2 ** (gs.num_moves - 15)
+    # if gs.num_moves > 20:
+    #     if not gs.blackHasCastled:
+    #         score += 2 ** (gs.num_moves - 20)
+    #     if not gs.whiteHasCastled:
+    #         score -= 2 ** (gs.num_moves - 20)
     
     return score
 

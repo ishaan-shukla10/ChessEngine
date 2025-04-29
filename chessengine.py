@@ -1,4 +1,6 @@
 from helper_functions import isValidEnPassant
+from collections import Counter
+import copy
 
 
 pieceScores = {'K': 0, 'p': 1, 'N': 3, 'B': 3, 'R': 5, 'Q': 9}
@@ -49,6 +51,52 @@ class GameState():
         self.whiteHasCastled = False
         self.blackHasCastled = False
 
+        self.halfmove_clock = 0
+
+        self.position_history = []
+        self.last_position = ()
+
+
+    def record_position(self):
+        board_state = copy.deepcopy(self.board)
+        position = {
+            'board': board_state,
+            'whiteToMove': self.whiteToMove,
+            'castling': (self.currentCastlingRights.wks, self.currentCastlingRights.wqs,
+                        self.currentCastlingRights.bks, self.currentCastlingRights.bqs),
+            'enPassant': self.enPassantPossible
+        }
+        
+        # Convert the position to a string for hashing
+        position_str = str(position)
+        self.position_history.append(position_str)
+
+    def is_threefold_repetition(self):
+        # Count occurrences of each position
+        position_counts = Counter(self.position_history)
+        
+        # Check if any position appears three or more times
+        for position, count in position_counts.items():
+            if count >= 3:
+                return True
+        
+        return False
+    
+    def is_fifty_move_rule(self):
+        return self.halfmove_clock >= 100
+    
+    def is_draw(self):
+        if self.stalemate:
+            return True
+        
+        if self.is_threefold_repetition():
+            return True
+        
+        if self.is_fifty_move_rule():
+            return True
+
+        return False
+
 
     def makeMove(self, move):
         self.board[move.startRow][move.startCol] = "--"
@@ -56,6 +104,11 @@ class GameState():
         self.moveLog.append(move)
         self.num_moves += 1
         self.whiteToMove = not self.whiteToMove
+
+        if move.pieceMoved[1] == 'p' or move.isCapture:
+            self.halfmove_clock = 0
+        else:
+            self.halfmove_clock += 1
 
         self.countAttacksAndDefends()
 
@@ -97,13 +150,28 @@ class GameState():
         self.castlingRightsLog.append(CastlingRights(self.currentCastlingRights.wks,self.currentCastlingRights.bks,
                 self.currentCastlingRights.wqs, self.currentCastlingRights.bqs,))
         
-
+        self.record_position()
+        
 
 
     def undoMove(self):
         if len(self.moveLog) != 0:
+            if self.position_history:
+                self.position_history.pop()
+
             move = self.moveLog.pop()
             self.num_moves -= 1
+
+            if move.pieceMoved[1] == 'p' or move.isCapture:
+                if len(self.moveLog) > 0:
+                    last_move = self.moveLog[-1]
+                    if last_move.pieceMoved[1] == 'p'or last_move.isCapture:
+                        self.halfmove_clock = 0
+                    else:
+                        self.halfmove_clock = max(0, self.halfmove_clock - 1)
+            else:
+                self.halfmove_clock = max(0, self.halfmove_clock - 1)
+
             self.board[move.startRow][move.startCol] = move.pieceMoved
             self.board[move.endRow][move.endCol] = move.pieceCaptured
             self.whiteToMove = not self.whiteToMove
@@ -270,6 +338,10 @@ class GameState():
         else:
             self.checkmate = False
             self.stalemate = False
+
+        if self.is_threefold_repetition() or self.is_fifty_move_rule():
+            self.stalemate = True
+        
        
         if self.whiteToMove:
             self.getCastleMoves(
@@ -299,6 +371,7 @@ class GameState():
         for move in oppoMoves:
             if move.endRow == r and move.endCol == c:
                 return True
+        return False
         
 
 
@@ -441,6 +514,8 @@ class GameState():
         moveScores.sort(key=lambda x: x[1], reverse=True)
 
         return [move[0] for move in moveScores]
+
+    
 
 
     def countAttacksAndDefends(self):
