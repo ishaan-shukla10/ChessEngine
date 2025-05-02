@@ -21,6 +21,7 @@ Building upon Sharick's work, this code incorporates several improvements and ne
   4) Addition of sounds as per moves (different for castling, piece captures, piece movements and promotions).
   5) Highlighting the most recent move made so that the last move made can be detected easily.
   6) UI based piece selection menu for pawn promotion.
+  7) Added functionality for flipping the board to change POVs if playing with black against the computer, or playing 1v1 offline with 2 humans.
 * **Additional Enhancements:**
   1) Added multiple PGN files for different openings under the openings folder.
   2) Added some trained positions for openings under the opening_books folder.
