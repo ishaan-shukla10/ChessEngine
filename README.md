@@ -19,6 +19,7 @@ Building upon Sharick's work, this code incorporates several improvements and ne
   2) Drag and drop feature for pieces
   3) Drawing arrows with RMB (right mouse button) for easier calculations during move making
   4) Addition of sounds as per moves (different for castling, piece captures, piece movements and promotions)
+  5) Highlighting the most recent move made so that the last move made can be detected easily 
 * **Additional Enhancements:**
   1) Added multiple PGN files for different openings under the openings folder.
   2) Added some trained positions for openings under the opening_books folder.
