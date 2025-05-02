@@ -1,6 +1,7 @@
 import random
 from openingbook import OpeningBook
 
+# Piece values - pretty standard stuff
 pieceScores = {'K': 0, 'p': 1, 'N': 3, 'B': 3, 'R': 5, 'Q': 9}
 
 knightScores = [[0, 0, 0, 0, 0, 0, 0, 0],
@@ -13,6 +14,7 @@ knightScores = [[0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0]]
 
 
+# Bishops also better in center, but some tweaking might be required.
 bishopScores = [[0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 1, 1, 1, 1, 1, 1, 0],
                 [0, 1, 2, 2, 2, 2, 1, 0],
@@ -22,10 +24,12 @@ bishopScores = [[0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 1, 1, 1, 1, 1, 1, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0]]
 
+# Cannot figure out best positions on board for queens and rooks
 queenScores = [[0 for _ in range(8)] for _ in range(8)]
-
 rookScores = [[0 for _ in range(8)] for _ in range(8)]
 
+# White pawns get better as they advance
+# Extra points for central pawns too
 whitePawnScores = [[8, 8, 8, 8, 8, 8, 8, 8], 
                    [5, 5, 5, 5, 5, 5, 5, 5],
                    [3, 3, 4, 4, 4, 4, 3, 3],
@@ -35,6 +39,7 @@ whitePawnScores = [[8, 8, 8, 8, 8, 8, 8, 8],
                    [1, 1, 1, 0, 0, 1, 1, 1], 
                    [0, 0, 0, 0, 0, 0, 0, 0]]
 
+# Same idea for black pawns, just flipped
 blackPawnScores = [[0, 0, 0, 0, 0, 0, 0, 0],
                    [1, 1, 1, 0, 0, 1, 1, 1],
                    [1, 1, 1, 2, 2, 1, 1, 1], 
@@ -44,28 +49,33 @@ blackPawnScores = [[0, 0, 0, 0, 0, 0, 0, 0],
                    [5, 5, 5, 5, 5, 5, 5, 5],
                    [8, 8, 8, 8, 8, 8, 8, 8]]
 
+# Bundle them all together for easier access
 piecePositionScores = {'N': knightScores, 'Q': queenScores, 'R': rookScores, 'B': bishopScores, 'bp': blackPawnScores, 
                        'wp': whitePawnScores}
 
+# Constants - might experiment with deeper search later if I can optimize this more
 CHECKMATE = 1000
 STALEMATE = 0
-DEPTH = 2
+DEPTH = 2 
 
 
-
+# Set up our opening book - Can choose opening based on your preferences
 opening_book = OpeningBook("opening_books/carokann.json")
-USE_OPENING_BOOK = True
-MAX_BOOK_MOVE = 10  
+USE_OPENING_BOOK = True  # Set to False if you want pure engine calculation
+MAX_BOOK_MOVE = 10  # How deep into the game we'll use the book
 
 def findRandomMove(validMoves):
+    # Not using this much, but nice for testing or introducing randomness
     return validMoves[random.randint(0, len(validMoves)-1)]
 
 
 def findGreedyMove(gs, validMoves):
+    # Simple 2-ply greedy search - looks for material gain
+    # Not as sophisticated as the full minimax but way faster
     turnMultiplier = 1 if gs.whiteToMove else -1
     bestPlayerMove = None
     opponentMinMaxScore = CHECKMATE
-    random.shuffle(validMoves)
+    random.shuffle(validMoves)  # Avoid predictable tie-breaking
 
     for playerMove in validMoves:
         gs.makeMove(playerMove)
@@ -99,6 +109,7 @@ def findBestMove(gs, validMoves, returnQueue):
     global nextMove
     nextMove = None
     
+    # Try to use opening book first if we're still in the opening
     if USE_OPENING_BOOK and len(gs.moveLog) < 2 * MAX_BOOK_MOVE:
         book_move = opening_book.get_book_move(gs.board, gs.whiteToMove, gs.currentCastlingRights, 
                                             gs.enPassantPossible[1] if gs.enPassantPossible else -1)
@@ -107,28 +118,34 @@ def findBestMove(gs, validMoves, returnQueue):
             returnQueue.put(book_move)
             return
     
+    # Shuffle moves for variety when scores are equal
     random.shuffle(validMoves)
     
+    # This pin detection was a huge improvement! Really helps avoid blunders
     current_pins = gs.detectAllPins()
-    ordered_moves = gs.orderMoves(validMoves)
+    ordered_moves = gs.orderMoves(validMoves)  # Move ordering makes alpha-beta way more effective
 
+    # The main search function - alpha-beta pruning with negamax
     findMoveNegaMaxAlphaBeta(gs, ordered_moves, DEPTH, -CHECKMATE, CHECKMATE, 1 if gs.whiteToMove else -1)
 
     returnQueue.put(nextMove) 
 
 
 def moveTargetsPinnedPiece(gs, move, pins):
+    # Bonus for targeting pinned pieces - these are often free captures
     pinned_squares = [(pin[0], pin[1]) for pin in pins]
 
     if (move.endRow, move.endCol) in pinned_squares:
         target_piece = gs.board[move.endRow][move.endCol]
-        if target_piece[1] != 'p':
+        if target_piece[1] != 'p':  # Pawns aren't worth as much
             return pieceScores[target_piece[1]]
     
     return 0
 
 
 def findMoveMinMax(gs, validMoves, depth, whiteToMove):
+    # Traditional minimax - this is actually pretty slow compared to negamax
+    # I'm keeping it for reference, but not using it anymore
     global nextMove
     if depth == 0:
         return scoreMaterial(gs.board)
@@ -160,6 +177,8 @@ def findMoveMinMax(gs, validMoves, depth, whiteToMove):
 
 
 def findMoveNegaMax(gs, validMoves, depth, turnMultiplier):
+    # More elegant than minimax, but still no pruning
+    # I've mostly switched to the alpha-beta version below
     global nextMove
     if depth == 0:
         return turnMultiplier * scoreBoard(gs)
@@ -177,11 +196,14 @@ def findMoveNegaMax(gs, validMoves, depth, turnMultiplier):
     return maxScore
 
 def findMoveNegaMaxAlphaBeta(gs, validMoves, depth, alpha, beta, turnMultiplier):
+    # This is the good stuff - probably 10x faster than plain minimax
+    # Alpha-beta pruning makes a huge difference for chess
     global nextMove
 
     if depth == 0:
         return turnMultiplier * scoreBoard(gs)
     
+    # Only order moves at shallower depths - ordering at every level is too expensive
     if depth < DEPTH:
         validMoves = gs.orderMoves(validMoves)
 
@@ -198,6 +220,7 @@ def findMoveNegaMaxAlphaBeta(gs, validMoves, depth, alpha, beta, turnMultiplier)
             if depth == DEPTH:
                 nextMove = move
                 print(move, score)
+                # Debug info to help understand what's happening with attacks
                 print("White attacks, ", gs.white_attacks)
                 print("White defends, ", gs.white_defends)
                 print("Black attacks, ", gs.black_attacks)
@@ -206,14 +229,12 @@ def findMoveNegaMaxAlphaBeta(gs, validMoves, depth, alpha, beta, turnMultiplier)
         if maxScore > alpha:
             alpha = maxScore
         if alpha >= beta:
-            break
+            break  # This is the pruning part - huge speedup!
 
     return maxScore
 
 
-
-
-
+# This fork detection was a gamechanger! My engine plays much more tactically now
 def detectForks(gs, color):
     """
     Detects forks for all piece types - situations where one piece attacks 
@@ -559,7 +580,9 @@ def evaluate_queen_fork_potential(gs, attacking_color, defending_color):
         # Calculate potential score if queen can attack multiple targets
         if len(potential_targets) >= 2:
             proximity_score = sum(0.1 * pieceScores[piece[1]] * weight for _, _, piece, weight in potential_targets)
-            potential_score += proximity_score * 0.7  # Lower weight for queens (using queen for forks is not optimal)
+            # Lower weight for queens because using your queen for forks isn't always smart
+            # Better to use minor pieces usually and keep queen safe
+            potential_score += proximity_score * 0.7  # Lower weight for queens
     
     return potential_score
 
@@ -613,33 +636,40 @@ def evaluate_pawn_fork_potential(gs, attacking_color, defending_color):
 
 
 def scoreBoard(gs):
+    """
+    Main evaluation function that calculates the overall score of the board.
+    Positive score favors white, negative score favors black.
+    """
     score = 0
 
+    # Check for checkmate or stalemate first
     if gs.checkmate:
         if gs.whiteToMove:
-            return -CHECKMATE
+            return -CHECKMATE  # Black wins
         else:
-            return CHECKMATE
+            return CHECKMATE   # White wins
     elif gs.stalemate:
-        return STALEMATE
+        return STALEMATE  # Draw
     
-    # Add development evaluation
+    # Add positional evaluation for early game piece development
     development_score = evaluateDevelopment(gs)
     score += development_score
     
-    # Add rook positioning evaluation
+    # Evaluate rook positioning (rooks on 7th rank, open files, etc)
     rook_positioning_score = evaluateRookPositioning(gs)
     score += rook_positioning_score
 
+    # Detect tactical opportunities - forks for both sides
     white_forks = detectForks(gs, 'w')
     black_forks = detectForks(gs, 'b')
 
-    # Process white forks
+    # Process white forks and add to score
     for fork in white_forks:
-        # Base score calculation
+        # Base score calculation - more valuable pieces being forked = higher score
         fork_score = 0.5 + (fork['value'] * 0.2)
         
-        # Piece-specific modifiers
+        # Adjust score based on which piece is creating the fork
+        # Pawns and knights creating forks are especially valuable
         if fork['piece_type'] == 'p':
             fork_score *= 1.5  # Pawn forks are very valuable
         elif fork['piece_type'] == 'N':
@@ -651,18 +681,16 @@ def scoreBoard(gs):
         elif fork['piece_type'] == 'Q':
             fork_score *= 0.8  # Queen forks (less optimal use of queen)
         
-        # Extra bonus for forking the king
+        # Extra bonus if king is one of the forked pieces
         if any(target[2][1] == 'K' for target in fork['targets']):
             fork_score *= 1.5
         
         score += fork_score
 
-    # Process black forks
+    # Process black forks - same logic but subtract from score
     for fork in black_forks:
-        # Base score calculation
         fork_score = 0.5 + (fork['value'] * 0.2)
         
-        # Piece-specific modifiers
         if fork['piece_type'] == 'p':
             fork_score *= 1.5
         elif fork['piece_type'] == 'N':
@@ -674,24 +702,25 @@ def scoreBoard(gs):
         elif fork['piece_type'] == 'Q':
             fork_score *= 0.8
         
-        # Extra bonus for forking the king
         if any(target[2][1] == 'K' for target in fork['targets']):
             fork_score *= 1.5
         
         score -= fork_score
 
-    # Add evaluation of fork potential for all pieces
+    # Look ahead for potential forks
     fork_potential = evaluateForkPotential(gs)
     score += fork_potential
     
+    # Find all pinned pieces on the board
     pins = gs.detectAllPins()
     pinned_pieces = [(pin[0], pin[1]) for pin in pins]
 
+    # Gather info about each pinned piece
     pinned_pieces_info = {}
     for pin in pins:
         row, col = pin[0], pin[1]
         piece = gs.board[row][col]
-        is_king_pin = pin[4]
+        is_king_pin = pin[4]  # True if the pin is against the king
 
         pinned_pieces_info[(row, col)] = {
             'piece': piece,
@@ -699,19 +728,23 @@ def scoreBoard(gs):
             'direction': (pin[2], pin[3])
         }
 
+    # Find pieces that are attacking pinned pieces
     attacking_pinned_pieces = []
     for r in range(8):
         for c in range(8):
             piece = gs.board[r][c]
             if piece != '--':
+                # If it's the current player's piece
                 if (gs.whiteToMove and piece[0] == 'w') or (not gs.whiteToMove and piece[0] == 'b'):
                     
+                    # Get all squares this piece can attack
                     attack_squares = gs.getPieceAttackSquares(r, c)
                     if attack_squares:
                         for square in attack_squares:
                             if square in pinned_pieces:
                                 target_piece = gs.board[square[0]][square[1]]
                                 
+                                # Don't count attacks on pawns (less valuable)
                                 if target_piece[1] != 'p':
                                     attacking_pinned_pieces.append({
                                         'attacker': (r, c),
@@ -720,9 +753,12 @@ def scoreBoard(gs):
                                         'is_king_pin': pinned_pieces_info[square]['is_king_pin']
                                     })
 
+    # Give bonus points for attacking pinned pieces
     for attack in attacking_pinned_pieces:
+        # More valuable pieces give higher bonus when pinned
         pin_bonus = attack['piece_value'] * 0.3  
         
+        # Extra bonus for pieces pinned to the king
         if attack['is_king_pin']:
             pin_bonus *= 1.5
             
@@ -731,11 +767,14 @@ def scoreBoard(gs):
         else:
             score -= pin_bonus
     
+    # Check if the opponent is in check, which is a slight advantage
     gs.whiteToMove = not gs.whiteToMove
     if gs.inCheck():
         score += 0.2 if gs.whiteToMove else -0.2
     gs.whiteToMove = not gs.whiteToMove
 
+    # Add attack and defense count bonuses
+    # More attacks and defended pieces = better position
     totalAttacks = gs.white_attacks['total'] if gs.whiteToMove else gs.black_attacks['total']
     totalDefends = gs.white_defends['total'] if gs.whiteToMove else gs.black_defends['total']
 
@@ -744,32 +783,39 @@ def scoreBoard(gs):
     else:
         score -= totalAttacks * 0.08 + totalDefends * 0.05
 
+    # Evaluate each piece on the board based on position and value
     for row in range(len(gs.board)):
         for col in range(len(gs.board[row])):
             square = gs.board[row][col]
-            if square != '--':
+            if square != '--':  # If square is not empty
                 piecePositionScore = 0
-                if square[1] != 'K':
-                    if square[1] == 'p':
+                # Get positional score (where on board is good for this piece)
+                if square[1] != 'K':  # Not a king
+                    if square[1] == 'p':  # Pawns have special position tables
                         piecePositionScore = piecePositionScores[square][row][col]
                     else:
                         piecePositionScore = piecePositionScores[square[1]][row][col]
                 
+                # Bonus for pieces that are maintaining pins
                 pin_maintainer_bonus = 0
                 if (row, col) in [attack['attacker'] for attack in attacking_pinned_pieces]:
                     pin_maintainer_bonus = 0.4  
                 
+                # Add piece value + position bonus + pin maintainer bonus
                 piece_value = pieceScores[square[1]]
                 if square[0] == 'w':
                     score += piece_value + piecePositionScore * 0.05 + pin_maintainer_bonus
                 elif square[0] == 'b':
                     score -= piece_value + piecePositionScore * 0.05 + pin_maintainer_bonus
                 
+                # Apply penalty for being pinned
                 if (row, col) in pinned_pieces:
                     pin_info = pinned_pieces_info[(row, col)]
                     
+                    # Penalty based on piece value
                     pin_penalty = piece_value * 0.1  
                     
+                    # Higher penalty for king pins
                     if pin_info['is_king_pin']:
                         pin_penalty *= 1.2
                     
@@ -778,6 +824,7 @@ def scoreBoard(gs):
                     else:
                         score += pin_penalty
 
+    # Uncomment this section to add castling incentives in mid/late game
     # if gs.num_moves > 20:
     #     if not gs.blackHasCastled:
     #         score += 2 ** (gs.num_moves - 20)
@@ -789,21 +836,23 @@ def scoreBoard(gs):
 def evaluateDevelopment(gs):
     """
     Evaluates piece development in the opening.
-    Penalizes undeveloped minor pieces in the opening phase and rewards proper development.
+    Penalizes undeveloped minor pieces and rewards proper development.
+    Returns a score bonus/penalty that's weighted by game phase.
     """
-    if gs.num_moves > 20:  # Only apply in opening/early middlegame phase
+    # Only apply this evaluation in opening/early middlegame
+    if gs.num_moves > 20:  
         return 0
     
     development_score = 0
     
-    # Scale development weight based on game phase
+    # Scale development weight based on game phase - very important early, less so later
     if gs.num_moves <= 10:  # Early opening
-        development_weight = 4.0 - gs.num_moves * 0.2  # Starts very high and decreases
+        development_weight = 4.0 - gs.num_moves * 0.2  # Starts high and decreases
     else:
         development_weight = max(1.0, 3.0 - gs.num_moves * 0.1)
     
-    # Check white minor pieces
-    # Knights starting at b1 and g1, Bishops at c1 and f1
+    # Check white minor pieces (knights and bishops)
+    # Starting positions: knights at b1/g1, bishops at c1/f1
     white_minor_starting_positions = [(7, 1), (7, 6), (7, 2), (7, 5)]
     white_undeveloped = 0
     
@@ -813,7 +862,7 @@ def evaluateDevelopment(gs):
             white_undeveloped += 1
     
     # Check black minor pieces
-    # Knights starting at b8 and g8, Bishops at c8 and f8
+    # Starting positions: knights at b8/g8, bishops at c8/f8
     black_minor_starting_positions = [(0, 1), (0, 6), (0, 2), (0, 5)]
     black_undeveloped = 0
     
@@ -823,17 +872,18 @@ def evaluateDevelopment(gs):
             black_undeveloped += 1
     
     # Apply penalties for undeveloped pieces
-    development_penalty = 0.5 * development_weight  # 0.5 points per undeveloped piece, scaled by game phase
+    # 0.5 points per undeveloped piece, scaled by game phase
+    development_penalty = 0.5 * development_weight  
     development_score = (black_undeveloped - white_undeveloped) * development_penalty
     
     # Check if knights and bishops are developed to good squares
     good_development_bonus = 0.2 * development_weight
     
-    # Good knight development squares
+    # Good squares for knights (center and near-center)
     white_good_knight_squares = [(5, 2), (5, 5), (4, 3), (4, 4), (5, 3), (5, 4)]
     black_good_knight_squares = [(2, 2), (2, 5), (3, 3), (3, 4), (2, 3), (2, 4)]
     
-    # Good bishop development squares
+    # Good squares for bishops (diagonals and fianchetto positions)
     white_good_bishop_squares = [(6, 2), (6, 5), (5, 1), (5, 6), (4, 2), (4, 5)]
     black_good_bishop_squares = [(1, 2), (1, 5), (2, 1), (2, 6), (3, 2), (3, 5)]
     
@@ -856,6 +906,7 @@ def evaluateDevelopment(gs):
     development_score += (white_well_developed - black_well_developed) * good_development_bonus
     
     # Penalize moving the same piece multiple times in the opening
+    # This encourages developing different pieces instead of moving the same one
     if gs.num_moves < 12 and hasattr(gs, 'moveLog') and len(gs.moveLog) > 0:
         piece_moves_count = {}
         for move in gs.moveLog:
@@ -864,14 +915,14 @@ def evaluateDevelopment(gs):
                 piece_moves_count[piece_key] = 0
             piece_moves_count[piece_key] += 1
             
-            # Penalize moving the same piece multiple times early
+            # Penalty for moving minor pieces or queen multiple times
             if piece_moves_count[piece_key] > 1 and move.pieceMoved[1] in ['N', 'B', 'Q']:
                 if move.pieceMoved[0] == 'w':
                     development_score -= 0.3 * development_weight
                 else:
                     development_score += 0.3 * development_weight
     
-    # Bonus for castling (already handled elsewhere, but we could add extra incentive)
+    # Bonus for castling - important for king safety and rook development
     if hasattr(gs, 'whiteHasCastled') and gs.whiteHasCastled:
         development_score += 0.5 * development_weight
     if hasattr(gs, 'blackHasCastled') and gs.blackHasCastled:
@@ -883,11 +934,11 @@ def evaluatePassedPawns(gs):
     """
     Gives bonus points for passed pawns that have a clear path to promotion.
     A passed pawn has no opposing pawns in front of it or on adjacent files.
-    Value scales with game phase and advancement.
+    Bonus scales with game phase and pawn advancement.
     """
     score = 0
     
-    # Scale based on game phase
+    # Passed pawns become more important as the game progresses
     if gs.num_moves < 10:
         phase_multiplier = 0.4  # Less important in opening
     elif gs.num_moves < 25:
@@ -897,11 +948,11 @@ def evaluatePassedPawns(gs):
     
     # Check for white passed pawns
     for col in range(8):
-        for row in range(6, 0, -1):  # From rank 2 to 7
+        for row in range(6, 0, -1):  # From rank 2 to 7 (bottom to top)
             if gs.board[row][col] == 'wp':
                 is_passed = True
                 
-                # Check if there are black pawns that can block
+                # Check if there are black pawns that can block or capture
                 for check_row in range(row-1, -1, -1):
                     for check_col in range(max(0, col-1), min(8, col+2)):
                         if gs.board[check_row][check_col] == 'bp':
@@ -911,14 +962,14 @@ def evaluatePassedPawns(gs):
                         break
                 
                 if is_passed:
-                    # Base bonus for a passed pawn
+                    # Base bonus for having a passed pawn
                     base_bonus = 0.5
                     
-                    # The further advanced the pawn, the higher the bonus (exponential)
+                    # The further advanced, the higher the bonus (exponential growth)
                     rank = 7 - row  # Convert to chess rank (0-7)
-                    advancement_bonus = 0.2 * (2 ** (rank - 1))  # Exponential growth for advancement
+                    advancement_bonus = 0.2 * (2 ** (rank - 1))  # Grows exponentially with rank
                     
-                    # Additional bonus if the pawn is protected
+                    # Additional bonus if the pawn is protected by friendly pieces
                     is_protected = False
                     for check_row in range(max(0, row-1), min(8, row+2)):
                         for check_col in range(max(0, col-1), min(8, col+2)):
@@ -928,19 +979,19 @@ def evaluatePassedPawns(gs):
                     
                     protection_bonus = 0.2 if is_protected else 0
                     
-                    # Calculate total bonus
+                    # Total bonus for this passed pawn
                     total_bonus = (base_bonus + advancement_bonus + protection_bonus) * phase_multiplier
                     score += total_bonus
                 
                 break  # Only check the most advanced pawn in each file
     
-    # Check for black passed pawns
+    # Check for black passed pawns - same logic but subtract from score
     for col in range(8):
-        for row in range(1, 7):  # From rank 7 to 2
+        for row in range(1, 7):  # From rank 7 to 2 (top to bottom)
             if gs.board[row][col] == 'bp':
                 is_passed = True
                 
-                # Check if there are white pawns that can block
+                # Check if there are white pawns that can block or capture
                 for check_row in range(row+1, 8):
                     for check_col in range(max(0, col-1), min(8, col+2)):
                         if gs.board[check_row][check_col] == 'wp':
@@ -950,14 +1001,11 @@ def evaluatePassedPawns(gs):
                         break
                 
                 if is_passed:
-                    # Base bonus for a passed pawn
                     base_bonus = 0.5
                     
-                    # The further advanced the pawn, the higher the bonus (exponential)
                     rank = row  # Convert to chess rank (0-7)
-                    advancement_bonus = 0.2 * (2 ** (rank - 1))  # Exponential growth for advancement
+                    advancement_bonus = 0.2 * (2 ** (rank - 1))
                     
-                    # Additional bonus if the pawn is protected
                     is_protected = False
                     for check_row in range(max(0, row-1), min(8, row+2)):
                         for check_col in range(max(0, col-1), min(8, col+2)):
@@ -967,40 +1015,42 @@ def evaluatePassedPawns(gs):
                     
                     protection_bonus = 0.2 if is_protected else 0
                     
-                    # Calculate total bonus
                     total_bonus = (base_bonus + advancement_bonus + protection_bonus) * phase_multiplier
                     score -= total_bonus
                 
-                break  # Only check the most advanced pawn in each file
+                break
     
     return score
 
 def evaluateCenterPawnStructure(gs):
     """
-    Evaluates center pawn structure, focusing on center control, 
-    pawn chains, and proper development of the pawn structure.
+    Evaluates pawn structure, focusing on center control, pawn chains,
+    and proper development. Good pawn structure is key to controlling
+    the board and having a solid positional advantage.
     """
     score = 0
     
-    # Scale based on game phase - more important in opening and early middlegame
+    # Pawn structure is most important in opening and middlegame
     if gs.num_moves < 10:
-        phase_multiplier = 1.5
+        phase_multiplier = 1.5  # Very important in opening
     elif gs.num_moves < 25:
-        phase_multiplier = 1.0
+        phase_multiplier = 1.0  # Important in middlegame
     else:
-        phase_multiplier = 0.7
+        phase_multiplier = 0.7  # Less important in endgame
     
     # 1. Evaluate center control with pawns (d4, e4, d5, e5)
+    # These are the four central squares
     center_squares = [(3, 3), (3, 4), (4, 3), (4, 4)]
     
     for square in center_squares:
         row, col = square
         if gs.board[row][col] == 'wp':
-            score += 0.4  # White pawn controlling center
+            score += 0.4  # White pawn directly controlling center
         elif gs.board[row][col] == 'bp':
-            score -= 0.4  # Black pawn controlling center
+            score -= 0.4  # Black pawn directly controlling center
     
     # 2. Evaluate extended center control (c3-c6, f3-f6, d3-d6, e3-e6)
+    # The squares surrounding the center
     extended_center = [
         (2, 2), (2, 3), (2, 4), (2, 5),  # Ranks 3
         (5, 2), (5, 3), (5, 4), (5, 5)   # Ranks 6
@@ -1014,28 +1064,29 @@ def evaluateCenterPawnStructure(gs):
             score -= 0.2  # Black pawn in extended center
     
     # 3. Evaluate pawn chains and structure
-    # Check for white pawn chains
+    # Good pawn chains provide protection and control space
     white_chain_bonus = evaluatePawnChains(gs, 'w')
     black_chain_bonus = evaluatePawnChains(gs, 'b')
     
     score += white_chain_bonus - black_chain_bonus
     
-    # 4. Penalize isolated and doubled pawns
+    # 4. Penalize isolated and doubled pawns (structural weaknesses)
     white_structure_penalty = evaluatePawnStructureWeaknesses(gs, 'w')
     black_structure_penalty = evaluatePawnStructureWeaknesses(gs, 'b')
     
     score -= white_structure_penalty - black_structure_penalty
     
     # 5. Penalize excessive pawn movement in opening
+    # Moving too many pawns early weakens position and delays development
     if gs.num_moves < 10:
         white_moved_pawns = 0
         black_moved_pawns = 0
         
         # Count pawns that have moved from their starting positions
         for col in range(8):
-            if gs.board[6][col] != 'wp':
+            if gs.board[6][col] != 'wp':  # White pawns start on row 6
                 white_moved_pawns += 1
-            if gs.board[1][col] != 'bp':
+            if gs.board[1][col] != 'bp':  # Black pawns start on row 1
                 black_moved_pawns += 1
         
         # Penalize moving more than 3 pawns in the opening
@@ -1050,18 +1101,19 @@ def evaluatePawnChains(gs, color):
     """
     Helper function to evaluate pawn chains for a specific color.
     A pawn chain is where pawns protect each other diagonally.
+    These provide strong structure and spatial control.
     """
     chain_bonus = 0
     color_char = color  # 'w' or 'b'
     pawn_char = color_char + 'p'
     
-    # Direction for checking diagonal protection (up-right and up-left)
+    # Direction for checking diagonal protection
     if color_char == 'w':
         protection_directions = [(-1, -1), (-1, 1)]  # White pawns protect diagonally up
     else:
         protection_directions = [(1, -1), (1, 1)]    # Black pawns protect diagonally down
     
-    # Check for all pawns
+    # Check all pawns on the board
     for row in range(8):
         for col in range(8):
             if gs.board[row][col] == pawn_char:
@@ -1074,7 +1126,7 @@ def evaluatePawnChains(gs, color):
                             is_protected = True
                             chain_bonus += 0.1  # Bonus for being part of a chain
                 
-                # Additional bonus if the pawn is in the center
+                # Additional bonus if the pawn is in the center area
                 if is_protected and 2 <= row <= 5 and 2 <= col <= 5:
                     chain_bonus += 0.1  # Extra bonus for central pawn chains
     
@@ -1082,7 +1134,9 @@ def evaluatePawnChains(gs, color):
 
 def evaluatePawnStructureWeaknesses(gs, color):
     """
-    Helper function to evaluate pawn structure weaknesses (isolated and doubled pawns).
+    Helper function to evaluate pawn structure weaknesses.
+    Identifies and penalizes isolated and doubled pawns.
+    These are structural weaknesses that can be exploited.
     """
     weakness_penalty = 0
     color_char = color  # 'w' or 'b'
@@ -1096,11 +1150,13 @@ def evaluatePawnStructureWeaknesses(gs, color):
                 pawns_in_file[col] += 1
     
     # Check for doubled pawns (more than one pawn in a file)
+    # These are harder to advance and can be blockaded
     for col in range(8):
         if pawns_in_file[col] > 1:
             weakness_penalty += 0.3 * (pawns_in_file[col] - 1)  # Penalty for each doubled pawn
     
     # Check for isolated pawns (no friendly pawns in adjacent files)
+    # These can't be protected by other pawns
     for col in range(8):
         if pawns_in_file[col] > 0:
             has_neighbor = False
@@ -1116,8 +1172,14 @@ def evaluatePawnStructureWeaknesses(gs, color):
 
 
 def penalizeExcessivePawnMovement(gs):
+    """
+    Penalizes moving too many pawns in the opening phase.
+    Moving too many pawns early delays piece development and can
+    weaken king safety.
+    """
+    # Only apply in opening phase
     if gs.num_moves > 10:
-        return 0  # Only apply in opening
+        return 0
         
     penalty = 0
     white_moved_pawns = 0
@@ -1125,12 +1187,13 @@ def penalizeExcessivePawnMovement(gs):
     
     # Count pawns that have moved from their starting positions
     for col in range(8):
-        if gs.board[6][col] != 'wp':
+        if gs.board[6][col] != 'wp':  # White pawns start on row 6
             white_moved_pawns += 1
-        if gs.board[1][col] != 'bp':
+        if gs.board[1][col] != 'bp':  # Black pawns start on row 1
             black_moved_pawns += 1
     
-    # Penalize moving more than 2-3 pawns in the opening
+    # Penalize moving more than 3 pawns in the opening
+    # General guideline: focus on developing pieces first, control center with 2-3 pawns
     if white_moved_pawns > 3:
         penalty -= (white_moved_pawns - 3) * 0.2
     if black_moved_pawns > 3:
@@ -1141,24 +1204,24 @@ def penalizeExcessivePawnMovement(gs):
 
 def evaluateRookPositioning(gs):
     """
-    Evaluates rook positioning, giving bonus points for:
-    - White rooks on 7th rank (row 1)
-    - Black rooks on 2nd rank (row 6)
+    Evaluates rook positioning, giving bonus points for favorable positions.
+    Rooks on the 7th rank are particularly strong, as are rooks on open files.
     """
     rook_score = 0
     rook_seventh_rank_bonus = 0.7  # Substantial bonus for a rook on 7th/2nd rank
     
-    # Check white rooks on 7th rank (row 1)
+    # Check white rooks on 7th rank (row 1) - threatening enemy pawns and king
     for col in range(8):
         if gs.board[1][col] == 'wR':
             rook_score += rook_seventh_rank_bonus
     
-    # Check black rooks on 2nd rank (row 6)
+    # Check black rooks on 2nd rank (row 6) - threatening enemy pawns and king
     for col in range(8):
         if gs.board[6][col] == 'bR':
             rook_score -= rook_seventh_rank_bonus
     
     # Additional bonus for controlling open or semi-open files
+    # Rooks are most powerful when they have vertical mobility
     rook_score += evaluateRooksOnOpenFiles(gs)
     
     return rook_score
@@ -1166,12 +1229,12 @@ def evaluateRookPositioning(gs):
 def evaluateRooksOnOpenFiles(gs):
     """
     Gives bonus points for rooks on open or semi-open files.
-    - Open file: No pawns on the file
-    - Semi-open file: No friendly pawns on the file
+    - Open file: No pawns on the file (maximum mobility)
+    - Semi-open file: No friendly pawns on the file (good for attacking)
     """
     score = 0
-    open_file_bonus = 0.3
-    semi_open_file_bonus = 0.15
+    open_file_bonus = 0.3      # No pawns at all on file
+    semi_open_file_bonus = 0.15  # No friendly pawns on file
     
     # Check each file (column)
     for col in range(8):
@@ -1208,20 +1271,29 @@ def evaluateRooksOnOpenFiles(gs):
     return score
 
 
-
 def scoreMaterial(board):
+    """
+    Calculates the raw material score by adding up the value
+    of all pieces on the board.
+    Positive score favors white, negative score favors black.
+    """
     score = 0
     for row in board:
         for square in row:
-            if square[0] == 'w':
+            if square[0] == 'w':  # White piece
                 score += pieceScores[square[1]]
-            elif square[0] == 'b':
+            elif square[0] == 'b':  # Black piece
                 score -= pieceScores[square[1]]
 
     return score
 
 
 def record_move_to_opening_book(gs, move, quality=1):
+    """
+    Records a move to the opening book database if it's within the
+    first MAX_BOOK_MOVE moves of the game.
+    Used for training and building the engine's opening repertoire.
+    """
     if len(gs.moveLog) <= MAX_BOOK_MOVE:
         position_hash = opening_book.add_position(gs.board, move, quality)
         print(f"Added position {position_hash} to opening book")
