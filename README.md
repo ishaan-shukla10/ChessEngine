@@ -14,6 +14,7 @@ Building upon Sharick's work, this code incorporates several improvements and ne
   2) Added heuristic scores for concepts of forks, pawn weaknesses (doubled pawns, isolated pawns), pawn strengths (pawn chains, center control, and protected pawn promotion), pinning pieces to king and queen, king safety, open files for rooks and piece developments.
   3) While searching for moves, engine follows the order of checks -> captures -> threats which is more intuitive and less time consuming.
   4) Added zobrist hashing for storing moves that occur commonly so that redundant calculcations are eliminated.
+  5) Added a scoreMoves function which scores the moves such that more obvious moves are inspected first, thus improving optimization.
 * **Enhanced User Interaction:** The user interface (UI) has been revamped to offer a more intuitive and user-friendly experience when interacting with the chessboard.
   1) Easy-on-the-eyes board color.
   2) Drag and drop feature for pieces.
