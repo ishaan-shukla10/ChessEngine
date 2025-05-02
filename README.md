@@ -11,7 +11,7 @@ Building upon Sharick's work, this code incorporates several improvements and ne
 
 * **Improved AI:** The AI component has been significantly enhanced to provide a stronger and more challenging opponent. This includes modifications and additions to the search algorithms and evaluation functions.
   1) Taught multiple openings to give the engine some background on opening theory, by storing most frequently obtained positions after standard openings.
-  2) Added heuristic scores for concepts of forks, pawn weaknesses (doubled pawns, isolated pawns) and king safety.
+  2) Added heuristic scores for concepts of forks, pawn weaknesses (doubled pawns, isolated pawns), king safety, open files for rooks and piece developments.
   3) While searching for moves, engine follows the order of checks -> captures -> threats which is more intuitive and less time consuming.
   4) Added zobrist hashing for storing moves that occur commonly so that redundant calculcations are eliminated.
 * **Enhanced User Interaction:** The user interface (UI) has been revamped to offer a more intuitive and user-friendly experience when interacting with the chessboard.
