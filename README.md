@@ -15,11 +15,12 @@ Building upon Sharick's work, this code incorporates several improvements and ne
   3) While searching for moves, engine follows the order of checks -> captures -> threats which is more intuitive and less time consuming.
   4) Added zobrist hashing for storing moves that occur commonly so that redundant calculcations are eliminated.
 * **Enhanced User Interaction:** The user interface (UI) has been revamped to offer a more intuitive and user-friendly experience when interacting with the chessboard.
-  1) Easy-on-the-eyes board color
-  2) Drag and drop feature for pieces
-  3) Drawing arrows with RMB (right mouse button) for easier calculations during move making
-  4) Addition of sounds as per moves (different for castling, piece captures, piece movements and promotions)
-  5) Highlighting the most recent move made so that the last move made can be detected easily 
+  1) Easy-on-the-eyes board color.
+  2) Drag and drop feature for pieces.
+  3) Drawing arrows with RMB (right mouse button) for easier calculations during move making.
+  4) Addition of sounds as per moves (different for castling, piece captures, piece movements and promotions).
+  5) Highlighting the most recent move made so that the last move made can be detected easily.
+  6) UI based piece selection menu for pawn promotion.
 * **Additional Enhancements:**
   1) Added multiple PGN files for different openings under the openings folder.
   2) Added some trained positions for openings under the opening_books folder.
