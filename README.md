@@ -60,3 +60,8 @@ Building upon Sharick's work, this code incorporates several improvements and ne
    ```bash
     python .\populate_opening_book.py --dir .\openings\london\ --max-moves 20 --quality 2.0 
     ```
+
+## Adjusting Depth: ##
+* To make the engine predict moves more accurately, change the 'DEPTH' variable inside smartmovefinder.py file. 
+* More depth -> more accurate moves but increased computational time
+* Additional optimizations can be done while finding the move, like using CUDA for parallel computation or using enhanced heuristics.
