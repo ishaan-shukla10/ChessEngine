@@ -43,7 +43,6 @@ class GameState():
         self.blackKingLocation = (0, 4)
         
         # Game status flags
-        # self.inCheck = False # This seems unused, replaced by checkForPinsAndChecks return value
         self.checkmate = False # True if the current player is checkmated
         self.stalemate = False # True if the current player is stalemated
 
@@ -91,7 +90,7 @@ class GameState():
         # Threefold repetition tracking
         # Stores a history of board positions (as strings) to detect repetitions.
         self.position_history = [] 
-        self.last_position = () # Seems unused? Maybe intended for incremental hashing later.
+        self.last_position = () 
 
     def record_position(self):
         """Captures the current board state, turn, castling rights, and en passant 
@@ -265,7 +264,7 @@ class GameState():
                         self.halfmove_clock = 0 
                     else:
                         # If the move before didn't reset, decrement the current clock (which was likely > 0)
-                         self.halfmove_clock = max(0, self.halfmove_clock - 1) # This line seems wrong if the undone move reset the clock to 0. It should probably look at a history log for the clock value.
+                         self.halfmove_clock = max(0, self.halfmove_clock - 1)
                 else: # If it was the very first move
                     self.halfmove_clock = 0
 
@@ -929,8 +928,7 @@ class GameState():
                 pinDirection = (self.pins[i][2], self.pins[i][3])
                 # Remove the pin from the list once handled (prevents re-checking)
                 # Note: Queens are handled in both Rook and Bishop moves, so don't remove if Queen?
-                # This check seems specific to not removing Queen pins here.
-                if self.board[r][c][1] != 'Q': # This check seems misplaced in getPawnMoves
+                if self.board[r][c][1] != 'Q':
                      self.pins.remove(self.pins[i]) # Remove the pin after finding it for this pawn.
                 break # Stop searching for pins for this piece
 
