@@ -11,7 +11,7 @@ Building upon Sharick's work, this code incorporates several improvements and ne
 
 * **Improved AI:** The AI component has been significantly enhanced to provide a stronger and more challenging opponent. This includes modifications and additions to the search algorithms and evaluation functions.
   1) Taught multiple openings (scotch, alekhine, caro kann, bogo) to give the engine some background on opening theory, by storing most frequently obtained positions after standard openings.
-  2) Added heuristic scores for concepts of forks, pawn weaknesses (doubled pawns, isolated pawns), pawn strengths (pawn chains, center control, and protected pawn promotion), pinning pieces to king and queen, king safety, open files for rooks and piece developments.
+  2) Significantly improved the scoreBoard method and added heuristic scores for concepts of forks, pawn weaknesses (doubled pawns, isolated pawns), pawn strengths (pawn chains, center control, and protected pawn promotion), pinning pieces to king and queen, king safety, open files for rooks and piece developments.
   3) While searching for moves, engine follows the order of checks -> captures -> threats which is more intuitive and less time consuming.
   4) Added zobrist hashing for storing moves that occur commonly so that redundant calculcations are eliminated.
   5) Added a scoreMoves function which scores the moves such that more obvious moves are inspected first, thus improving optimization.
